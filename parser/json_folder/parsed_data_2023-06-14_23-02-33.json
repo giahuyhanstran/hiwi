@@ -1,0 +1,7 @@
+{
+    "event_number": 0,
+    "event_millis": 1330330108324,
+    "event_type": "MESSAGE_RECEIVED",
+    "raw_message": "!Message ((!RawMessage |/QE1AQQAAAAtAAAAAAIBAAU=|)))",
+    "filter": "atomic"
+}
