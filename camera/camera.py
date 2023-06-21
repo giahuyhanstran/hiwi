@@ -4,11 +4,11 @@ import argparse
 import os
 
 # python camera.py --fps 30 --recording-time 10
-
+cap = cv2.VideoCapture(0)
 HEIGHT = 480
 WIDTH = 640
-DEFAULT_FPS = 30.0
-DEFAULT_RECORDING_TIME_SECONDS = 5
+DEFAULT_FPS = cap.get(cv2.CAP_PROP_FPS)
+DEFAULT_RECORDING_TIME = None
 
 
 def video(height, width, frames, folder):
@@ -21,19 +21,16 @@ def video(height, width, frames, folder):
     return frame_count, out, folder_path
 
 
-def record_video(fps=DEFAULT_FPS, recording_time=DEFAULT_RECORDING_TIME_SECONDS, output_folder="recordings"):
-    cap = cv2.VideoCapture(0)
-
+def record_video(fps=DEFAULT_FPS, recording_time=DEFAULT_RECORDING_TIME, output_folder="recordings"):
     if not cap.isOpened():
         print("unable to load cam")
         return
 
     frame_count, out, folder_path = video(HEIGHT, WIDTH, fps, output_folder)
 
-    total_frames = int(recording_time * fps)
-    start_time = datetime.datetime.now()
+    total_frames = int(recording_time * fps) if recording_time else None
 
-    while cap.isOpened() and frame_count < total_frames:
+    while cap.isOpened():
         ret, frame = cap.read()
 
         if not ret:
@@ -50,7 +47,7 @@ def record_video(fps=DEFAULT_FPS, recording_time=DEFAULT_RECORDING_TIME_SECONDS,
         cv2.imshow("Camera", frame)
 
         # Exit if 'q' is pressed
-        if cv2.waitKey(1) == ord('q'):
+        if cv2.waitKey(1) == ord('q') or (total_frames is not None and frame_count >= total_frames):
             break
 
     # Release everything when done
@@ -62,11 +59,10 @@ def record_video(fps=DEFAULT_FPS, recording_time=DEFAULT_RECORDING_TIME_SECONDS,
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Record video from camera')
     parser.add_argument('--fps', type=float, help='fps default 30.0')
-    parser.add_argument('--recording-time', type=int, help='recording time in sec default 30')
+    parser.add_argument('--recording-time', type=int, help='recording time in seconds')
     args = parser.parse_args()
 
     fps = args.fps if args.fps is not None else DEFAULT_FPS
-    recording_time = args.recording_time if args.recording_time is not None else DEFAULT_RECORDING_TIME_SECONDS
+    recording_time = args.recording_time if args.recording_time is not None else DEFAULT_RECORDING_TIME
 
     record_video(fps, recording_time)
-
