@@ -24,7 +24,7 @@ def record_video_audio(video_output_file, audio_output_file, current_date, dir_p
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     audio_format = pyaudio.paInt16
-    audio_channels = 1
+    audio_channels = 2
     audio_sample_rate = 44100
     audio_chunk_size = int(audio_sample_rate / fps)
 
@@ -52,11 +52,18 @@ def record_video_audio(video_output_file, audio_output_file, current_date, dir_p
         audio_data = stream.read(audio_chunk_size)
         audio_frames.append(audio_data)
 
+        # rm later
         video_data = (frame, audio_data)
         with open(file_path, 'wb') as file:
             pickle.dump(video_data, file)
-            print(type(video_data))
 
+        # TODO MQTT
+        ### MQTT
+
+
+        temp_data = pickle.dumps(video_data)
+
+        ###
         cv2.imshow("Camera", frame)
 
         # break con
@@ -76,6 +83,7 @@ def record_video_audio(video_output_file, audio_output_file, current_date, dir_p
     wf = wave.open(audio_output_file, 'wb')
     wf.setnchannels(audio_channels)
     wf.setsampwidth(p.get_sample_size(audio_format))
+    print(p.get_sample_size(audio_format))
     wf.setframerate(audio_sample_rate)
     wf.writeframes(b''.join(audio_frames))
     wf.close()
