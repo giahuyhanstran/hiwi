@@ -9,6 +9,9 @@ Note: Script is publishing on localhost port 1883 for topic "Camera"
       run process_video.py. You can use MQTT Explorer to check for data traffic.
 '''
 
+
+# TODO optional argsparse for length (mins)
+
 def record_video_audio():
     cap = cv2.VideoCapture(0)
 
@@ -31,10 +34,11 @@ def record_video_audio():
         if not ret:
             break
 
+        # TODO maybe Timestamp in Tuple
+
         audio_data = stream.read(audio_chunk_size)
         video_data = (frame, audio_data)
 
-        # Publish video_data as an MQTT message
         client.publish("Camera", pickle.dumps(video_data))
 
         cv2.imshow("Camera", frame)
@@ -52,11 +56,11 @@ def record_video_audio():
     stream.close()
     p.terminate()
 
-if __name__ == '__main__':
 
+if __name__ == '__main__':
     # Define MQTT Client and address of broker
     mqttBroker = "localhost"
     client = mqtt.Client("camera data")
     client.connect(host=mqttBroker, port=1883)
-    
+
     record_video_audio()
