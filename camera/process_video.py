@@ -1,6 +1,8 @@
 # TODO concate Video
 import os
 import pickle
+import subprocess
+
 import cv2
 import pyaudio
 import wave
@@ -25,32 +27,24 @@ def on_message(client, userdata, message):
     vw.write(content[0])
     wf.writeframes(content[1])
 
-# TODO make sure message in right order upon receive
-def sort_incoming_messages():
-    '''
-   sorted_pickles = sorted(os.listdir(DIRECTORY), key=lambda x: (
-   int(re.match(r'^(\d+)', x).group(0)) if re.match(r'^(\d+)', x) else float('inf'), x))
 
-    '''
-    pass
-
-
+'''
 def merge_audio_video(output_file):
     video = VideoFileClip(f'{current_date}.mp4')
     audio = AudioFileClip(f'{current_date}.wav')
     final_video = video.set_audio(audio)
     final_video.write_videofile(output_file, codec="libx264", audio_codec="aac")
 
-
-
 '''
+
+
 def merge_audio_video(output_file):
-    video_file = os.path.join(os.getcwd(), f'{DIRECTORY}_recreated_video.mp4')
-    audio_file = os.path.join(os.getcwd(), f'{DIRECTORY}_recreated_audio.wav')
+    video_file = os.path.join(os.getcwd(), f'{current_date}.mp4')
+    audio_file = os.path.join(os.getcwd(), f'{current_date}.wav')
 
     command = f'ffmpeg -i "{video_file}" -i "{audio_file}" -c:v copy -c:a aac -strict experimental "{output_file}"'
     subprocess.call(command, shell=True)
-'''
+
 
 if __name__ == '__main__':
 
