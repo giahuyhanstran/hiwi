@@ -1,7 +1,9 @@
 # TODO concate Video
+import argparse
 import os
 import pickle
 import subprocess
+import time
 
 import cv2
 import pyaudio
@@ -46,7 +48,20 @@ def merge_audio_video(output_file):
     subprocess.call(command, shell=True)
 
 
+def time_check(time_in_seconds):
+    start_time = time.time()
+    current_time = time.time()
+    elapsed_time = current_time - start_time
+
+    while elapsed_time < time_in_seconds:
+        current_time = time.time()
+        elapsed_time = current_time - start_time
+
+    return True
+
+
 if __name__ == '__main__':
+    time_done = False
 
     current_date = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     DIRECTORY = os.path.join(os.getcwd(), current_date)
@@ -59,7 +74,6 @@ if __name__ == '__main__':
     FPS = 30
 
     merged_data = {}
-    frame_counter: int = 0
 
     audio_sample_rate = 44100
     audio_chunk_size = int(audio_sample_rate / FPS)
@@ -80,13 +94,25 @@ if __name__ == '__main__':
     client.loop_start()
     client.subscribe("Camera")
     client.on_message = on_message
+
+    parser = argparse.ArgumentParser(description='get frame from mp4')
+    parser.add_argument('--length', type=int, help='default until interrupt, else time in seconds')
+    args = parser.parse_args()
+
+    length = args.length if args.length is not None else None
+
     # Loop until the stop key is pressed
     while True:
         # Check for a key press
         key = cv2.waitKey(1) & 0xFF
 
+        # extra time to start and catch up with record_camera.py
+        if length is not None:
+            if time_check(length + 30):
+                time_done = True
+
         # Break the loop if the stop key is pressed
-        if keyboard.is_pressed('q'):
+        if keyboard.is_pressed('q') or time_done:
             break
 
     client.loop_stop()
