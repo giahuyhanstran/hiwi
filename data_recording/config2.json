@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "advertise": {
+    "patientzone": {
+      "interval": 5000
+    },
+    "patientzone_inactive": {
+      "interval": 5000
+    }
+  }
+}
