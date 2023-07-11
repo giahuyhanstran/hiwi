@@ -11,7 +11,7 @@ import wave
 import paho.mqtt.client as mqtt
 import datetime
 import keyboard
-from moviepy.editor import VideoFileClip, AudioFileClip
+import speech_recognition as sr
 
 '''
 Note: Script is listening on localhost port 1883 for topic "Camera"
@@ -29,24 +29,31 @@ def on_message(client, userdata, message):
     vw.write(content[0])
     wf.writeframes(content[1])
 
-
-'''
 def merge_audio_video(output_file):
-    video = VideoFileClip(f'{current_date}.mp4')
-    audio = AudioFileClip(f'{current_date}.wav')
-    final_video = video.set_audio(audio)
-    final_video.write_videofile(output_file, codec="libx264", audio_codec="aac")
-
-'''
-
-
-def merge_audio_video(output_file):
-    video_file = os.path.join(os.getcwd(), f'{current_date}.mp4')
-    audio_file = os.path.join(os.getcwd(), f'{current_date}.wav')
+    video_file = f'{current_date}.mp4'
+    audio_file = f'{current_date}.wav'
 
     command = f'ffmpeg -i "{video_file}" -i "{audio_file}" -c:v copy -c:a aac -strict experimental "{output_file}"'
-    subprocess.call(command, shell=True)
+    subprocess.run(command, shell=True)
 
+def transcriber(input_file):
+
+    r = sr.Recognizer()
+    file = f"{current_date}.txt"
+
+    with sr.AudioFile(input_file) as source:
+        
+        audio = r.listen(source) 
+        
+        try:
+            transcription = (r.recognize_google(audio, language="de-DE,en-US"))
+            with open(file, "w") as output_file:
+                output_file.write(transcription)
+        except sr.UnknownValueError:
+            # handle unrecognized speech - insert a placeholder
+            placeholder = "<unrecognized>"
+            with open(file, "w") as output_file:
+                output_file.write(placeholder)
 
 def time_check(time_in_seconds):
     start_time = time.time()
@@ -112,11 +119,13 @@ if __name__ == '__main__':
                 time_done = True
 
         # Break the loop if the stop key is pressed
-        if keyboard.is_pressed('q') or time_done:
+        if keyboard.is_pressed('s') or time_done:
             break
 
     client.loop_stop()
 
     vw.release()
     wf.close()
+
     merge_audio_video(f'{current_date}_merged.mp4')
+    transcriber(f'{current_date}.wav')
