@@ -16,8 +16,6 @@ class MQTTSubscriber:
     """A class to connect to the MQTT broker."""
 
     def __init__(self, config: dict, path: str = 'matrix_data/'):
-        self.__data = {}
-        self.__last_data = {}
         self.__cfg = config
         self.__heartbeat = None
         self.__sensor_types = {'EC:8D:88:35:49:F9': '_foot_new',
@@ -51,6 +49,25 @@ class MQTTSubscriber:
         self.__client.subscribe(self.__topic)
         print('Subscribed to topics...')
 
+    def write_data(self, file_name, timestamp, files, type: int):
+
+        types = ['tof_readings', 'thermal_readings', ]
+        types_header = ['ToFZ_', 'TZ_']
+        with open(self.__path + file_name, 'a', newline='') as f:
+            print('Writing to ', file_name)
+            indices = [types_header[type] + str(i) for i in range(len(data[types[type]]))]
+            indices.append('time')
+            indices.append('frame')
+            readings = data[types[type]]
+            readings.append(timestamp)
+            readings.append(self.__heartbeat)
+            data = dict(zip(indices, readings))
+            w = DictWriter(f, fieldnames=data.keys())
+            if not file_name in files:
+                w.writeheader()
+            w.writerow(data)
+            f.close()
+
     def __on_message(self, client, userdata, message):
         """Function to be triggered when a new message arrives at the client. Decodes new incoming data and saves it to
         the corresponding csv file.
@@ -78,113 +95,11 @@ class MQTTSubscriber:
             file_name = sensor_name + '.csv'
             files = [f for f in listdir(self.__path) if isfile(join(self.__path, f))]
 
-            # file already exists
-            if file_name in files:
-                # if message is a ToF reading
-                if 'tof_readings' in data.keys():
-                    # if it's the ToF foot zone
-                    if file_name == 'ToF_foot_new.csv' or file_name == 'ToF_foot_old.csv':
-                        with open(self.__path + file_name, 'a', newline='') as f:
-                            print('Writing to ', file_name)
-                            # indices = self._get_indices(data['tof_readings'])
-                            indices = ['ToFZ_' + str(i) for i in range(len(data['tof_readings']))]
-                            indices.append('time')
-                            indices.append('frame')
-                            readings = data['tof_readings']
-                            readings.append(timestamp)
-                            readings.append(self.__heartbeat)
-                            data = dict(zip(indices, readings))
-                            w = DictWriter(f, fieldnames=data.keys())
-                            w.writerow(data)
-                            f.close()
+            if 'tof_readings' in data.keys():
+                self.write_data(file_name, timestamp, files, 0)
 
-                    # ToF right or left
-                    else:
-                        with open(self.__path + file_name, 'a', newline='') as f:
-                            print('Writing to ', file_name)
-                            # indices = self._get_indices(data['tof_readings'])
-                            indices = ['ToFZ_' + str(i) for i in range(len(data['tof_readings']))]
-                            indices.append('time')
-                            indices.append('frame')
-                            readings = data['tof_readings']
-                            readings.append(timestamp)
-                            readings.append(self.__heartbeat)
-                            data = dict(zip(indices, readings))
-                            w = DictWriter(f, fieldnames=data.keys())
-                            w.writerow(data)
-                            f.close()
-                # message is thermal reading
-                elif 'thermal_readings' in data.keys():
-                    # thermal foot zone
-                    with open(self.__path + file_name, 'a', newline='') as f:
-                        print('Writing to ', file_name)
-                        # indices = self._get_indices(data['thermal_readings'])
-                        indices = ['TZ_' + str(i) for i in range(len(data['thermal_readings']))]
-                        indices.append('time')
-                        indices.append('frame')
-                        readings = data['thermal_readings']
-                        readings.append(timestamp)
-                        readings.append(self.__heartbeat)
-                        data = dict(zip(indices, readings))
-                        w = DictWriter(f, fieldnames=data.keys())
-                        w.writerow(data)
-                        f.close()
-
-
-            # file does not exists
-            else:
-                # message is ToF reading
-                if 'tof_readings' in data.keys():
-                    # ToF foot zone
-                    if file_name == 'ToF_foot_new.csv' or file_name == 'ToF_foot_old.csv':
-                        with open(self.__path + file_name, 'a', newline='') as f:
-                            # indices = self._get_indices(data['tof_readings'])
-                            indices = ['ToFZ_' + str(i) for i in range(len(data['tof_readings']))]
-                            indices.append('time')
-                            indices.append('frame')
-                            readings = data['tof_readings']
-                            readings.append(timestamp)
-                            readings.append(self.__heartbeat)
-                            data = dict(zip(indices, readings))
-                            print('Writing to ', file_name)
-                            w = DictWriter(f, fieldnames=data.keys())
-                            w.writeheader()
-                            w.writerow(data)
-                            f.close()
-
-                    # ToF right or left
-                    else:
-                        with open(self.__path + file_name, 'a', newline='') as f:
-                            print('Writing to ', file_name)
-                            # indices = self._get_indices(data['tof_readings'])
-                            indices = ['ToFZ_' + str(i) for i in range(len(data['tof_readings']))]
-                            indices.append('time')
-                            indices.append('frame')
-                            readings = data['tof_readings']
-                            readings.append(timestamp)
-                            readings.append(self.__heartbeat)
-                            data = dict(zip(indices, readings))
-                            w = DictWriter(f, fieldnames=data.keys())
-                            w.writeheader()
-                            w.writerow(data)
-                            f.close()
-                # message is thermal reading
-                elif 'thermal_readings' in data.keys():
-                    # thermal foot zone
-                    with open(self.__path + file_name, 'a', newline='') as f:
-                        print('Writing to ', file_name)
-                        # indices = self._get_indices(data['thermal_readings'])
-                        indices = ['TZ_' + str(i) for i in range(len(data['thermal_readings']))]
-                        indices.append('time')
-                        indices.append('frame')
-                        readings = data['thermal_readings']
-                        readings.append(timestamp)
-                        readings.append(self.__heartbeat)
-                        data = dict(zip(indices, readings))
-                        w = DictWriter(f, fieldnames=data.keys())
-                        w.writeheader()
-                        w.writerow(data)
-                        f.close()   
+            elif 'thermal_readings' in data.keys():
+                self.write_data(file_name, timestamp, files, 1)
 
     def receive_messages(self, rc_time: int = None):
         """Function to receive/handle incoming MQTT messages.
