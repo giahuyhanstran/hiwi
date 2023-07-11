@@ -13,6 +13,8 @@ Note: Script is publishing on localhost port 1883 for topic "Camera"
 
 
 # TODO optional argsparse for length (mins)
+# TODO Optional publishen, optional Heartbeat (frame counter) auf einem extra topic senden
+# TODO wie oft wird der heartbeat gesendet
 
 def record_video_audio():
     cap = cv2.VideoCapture(0)
