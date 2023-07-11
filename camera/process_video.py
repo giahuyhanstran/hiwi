@@ -29,6 +29,7 @@ def on_message(client, userdata, message):
     vw.write(content[0])
     wf.writeframes(content[1])
 
+
 def merge_audio_video(output_file):
     video_file = f'{current_date}.mp4'
     audio_file = f'{current_date}.wav'
@@ -36,24 +37,9 @@ def merge_audio_video(output_file):
     command = f'ffmpeg -i "{video_file}" -i "{audio_file}" -c:v copy -c:a aac -strict experimental "{output_file}"'
     subprocess.run(command, shell=True)
 
-def transcriber(input_file):
 
-    r = sr.Recognizer()
-    file = f"{current_date}.txt"
 
-    with sr.AudioFile(input_file) as source:
-        
-        audio = r.listen(source) 
-        
-        try:
-            transcription = (r.recognize_google(audio, language="de-DE,en-US"))
-            with open(file, "w") as output_file:
-                output_file.write(transcription)
-        except sr.UnknownValueError:
-            # handle unrecognized speech - insert a placeholder
-            placeholder = "<unrecognized>"
-            with open(file, "w") as output_file:
-                output_file.write(placeholder)
+
 
 def time_check(time_in_seconds):
     start_time = time.time()
@@ -129,4 +115,5 @@ if __name__ == '__main__':
     wf.close()
 
     merge_audio_video(f'{current_date}_merged.mp4')
-    transcriber(f'{current_date}.wav')
+
+
