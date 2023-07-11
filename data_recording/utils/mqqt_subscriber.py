@@ -4,8 +4,6 @@ from utils.decoder import PayloadDecoder
 from random import randint
 from threading import Thread
 from numpy import sqrt
-import pandas as pd
-import sys
 import time
 from os import listdir, makedirs
 from os.path import isfile, join, exists
