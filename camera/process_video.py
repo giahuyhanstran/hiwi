@@ -94,7 +94,8 @@ if __name__ == '__main__':
     wf.setframerate(audio_sample_rate)
 
     # mqtt
-    mqttBroker = "localhost"
+    mqttBroker = '192.168.1.80'
+    # mqttBroker_L = "localhost"
     client = mqtt.Client("Laptop")
     client.connect(host=mqttBroker, port=1883)
 
