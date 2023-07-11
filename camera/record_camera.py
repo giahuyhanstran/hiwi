@@ -15,12 +15,15 @@ Note: Script is publishing on localhost port 1883 for topic "Camera"
 # TODO optional argsparse for length (mins)
 # TODO Optional publishen, optional Heartbeat (frame counter) auf einem extra topic senden
 # TODO wie oft wird der heartbeat gesendet
+# TODO on message function muss neuen Fall berücksichtigen
+
 
 def record_video_audio():
     cap = cv2.VideoCapture(0)
 
     if cap.isOpened():
         frame_counter = 0
+        Done = False
 
     # default settings
     FPS = int(cap.get(cv2.CAP_PROP_FPS))
@@ -45,12 +48,16 @@ def record_video_audio():
         audio_data = stream.read(AUDIO_CHUNK_SIZE)
         video_data = (frame, audio_data)
 
+        if frame_counter / FPS % heartbeat_interval_seconds == 0:
+            client.publish("Heartbeat", frame_counter)
+            print(frame_counter, " published")
+
         client.publish("Camera", pickle.dumps(video_data))
 
         cv2.imshow("Camera", frame)
 
         frame_counter += 1
-        Done = False
+        
 
         if length is not None:
             if frame_counter/FPS >= length:
@@ -71,6 +78,9 @@ def record_video_audio():
 
 
 if __name__ == '__main__':
+
+    heartbeat_interval_seconds = 5
+
     parser = argparse.ArgumentParser(description='get frame from mp4')
     parser.add_argument('--length', type=int, help='default until interrupt, else time in seconds')
     args = parser.parse_args()
@@ -78,7 +88,8 @@ if __name__ == '__main__':
     length = args.length if args.length is not None else None
 
     # Define MQTT Client and address of broker
-    mqttBroker = "localhost"
+    mqttBroker = '192.168.1.80'
+    # mqttBroker_L = "localhost"
     client = mqtt.Client("camera data")
     client.connect(host=mqttBroker, port=1883)
 
