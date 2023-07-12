@@ -1,9 +1,9 @@
 import argparse
-
 import cv2
 import pyaudio
 import pickle
 import paho.mqtt.client as mqtt
+import ast
 
 '''
 Note: Script is publishing on localhost port 1883 for topic "Camera"
@@ -12,10 +12,7 @@ Note: Script is publishing on localhost port 1883 for topic "Camera"
 '''
 
 
-# TODO optional argsparse for length (mins)
-# TODO Optional publishen, optional Heartbeat (frame counter) auf einem extra topic senden
-# TODO wie oft wird der heartbeat gesendet
-# TODO on message function muss neuen Fall berücksichtigen
+# TODO (if not arg.pub_data) -> save data locally, avoid data chunks and all that
 
 
 def record_video_audio():
@@ -48,11 +45,13 @@ def record_video_audio():
         audio_data = stream.read(AUDIO_CHUNK_SIZE)
         video_data = (frame, audio_data)
 
-        if frame_counter / FPS % heartbeat_interval_seconds == 0:
+        if args.pub_hb and (frame_counter / FPS % heartbeat_interval_seconds == 0):
             client.publish("Heartbeat", frame_counter)
-            print(frame_counter, " published")
 
-        client.publish("Camera", pickle.dumps(video_data))
+        if args.pub_data:
+            client.publish("Camera", pickle.dumps(video_data))
+        else:
+            pass # save data locally
 
         cv2.imshow("Camera", frame)
 
@@ -79,18 +78,22 @@ def record_video_audio():
 
 if __name__ == '__main__':
 
-    heartbeat_interval_seconds = 5
-
-    parser = argparse.ArgumentParser(description='get frame from mp4')
+    parser = argparse.ArgumentParser()
     parser.add_argument('--length', type=int, help='default until interrupt, else time in seconds')
+    parser.add_argument('--hb_interval', type=int, help='heartbeat interval in seconds, default = 1', default=1)
+    parser.add_argument('--pub_hb', type=ast.literal_eval, help='publish heartbeat? True or False, default = True', default=True)
+    parser.add_argument('--pub_data', type=ast.literal_eval, help='publish data? True or False, else save locally, default = True', default=True)
     args = parser.parse_args()
+
+    heartbeat_interval_seconds = args.hb_interval
 
     length = args.length if args.length is not None else None
 
-    # Define MQTT Client and address of broker
-    mqttBroker = '192.168.1.80'
-    # mqttBroker_L = "localhost"
-    client = mqtt.Client("camera data")
-    client.connect(host=mqttBroker, port=1883)
+    if not args.pub_hb and not args.pub_data:
+        # Define MQTT Client and address of broker
+        mqttBroker = '192.168.1.80'
+        # mqttBroker_L = "localhost"
+        client = mqtt.Client("camera data")
+        client.connect(host=mqttBroker, port=1883)
 
     record_video_audio()
