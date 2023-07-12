@@ -13,8 +13,9 @@ from csv import DictWriter
 class MQTTSubscriber:
     """A class to connect to the MQTT broker."""
 
-    def __init__(self, config: dict, path: str = 'matrix_data/'):
+    def __init__(self, config: dict, args, path: str = 'matrix_data/'):
         self.__cfg = config
+        self.__args = args
         self.__heartbeat = None
         self.__sensor_types = {'EC:8D:88:35:49:F9': '_foot_new',
                                'F8:60:BB:C0:58:A6': '_foot_old',
@@ -49,7 +50,7 @@ class MQTTSubscriber:
 
     def write_data(self, file_name, timestamp, files, type: int):
 
-        types = ['tof_readings', 'thermal_readings', ]
+        types = ['tof_readings', 'thermal_readings']
         types_header = ['ToFZ_', 'TZ_']
         with open(self.__path + file_name, 'a', newline='') as f:
             print('Writing to ', file_name)
@@ -66,6 +67,21 @@ class MQTTSubscriber:
             w.writerow(data)
             f.close()
 
+    def is_wanted(self, sensor_mac: str, sensor_name: str) -> bool :
+
+        in_is_empty = self.__args.include == None
+        message_in = any(item in self.__args.include for item in [sensor_mac, sensor_name])
+        message_out = any(item in self.__args.exclude for item in [sensor_mac, sensor_name])
+        
+        if in_is_empty:
+            if not message_out:
+                return True
+            return False
+        else:
+            if message_in:
+                return True
+            return False
+
     def __on_message(self, client, userdata, message):
         """Function to be triggered when a new message arrives at the client. Decodes new incoming data and saves it to
         the corresponding csv file.
@@ -78,26 +94,30 @@ class MQTTSubscriber:
         """
         if message.topic == "Heartbeat":
             self.__heartbeat = message.payload.decode("utf-8")
-        else:
-            payload = yaml.load(str(message.payload.decode("utf-8")), Loader=yaml.FullLoader)
-            data = self.__decoder.decode_payload(payload)
+            return
+        
+        payload = yaml.load(str(message.payload.decode("utf-8")), Loader=yaml.FullLoader)
+        data = self.__decoder.decode_payload(payload)
 
-            print("message_received: ", payload)
-            print('data_received: ', data)
-            print("message topic: ", message.topic)
+        print("message_received: ", payload)
+        print('data_received: ', data)
+        print("message topic: ", message.topic)
 
-            sensor_mac = message.topic.split('/')[1]
-            sensor_name = self._get_sensor_name(sensor_mac, data)
-            timestamp = payload['captured_at']
+        sensor_mac = message.topic.split('/')[1]
+        sensor_name = self._get_sensor_name(sensor_mac, data)
+        timestamp = payload['captured_at']
 
-            file_name = sensor_name + '.csv'
-            files = [f for f in listdir(self.__path) if isfile(join(self.__path, f))]
+        file_name = sensor_name + '.csv'
+        files = [f for f in listdir(self.__path) if isfile(join(self.__path, f))]
 
-            if 'tof_readings' in data.keys():
-                self.write_data(file_name, timestamp, files, 0)
+        if not self.is_wanted(sensor_mac, sensor_name):
+            return
+        
+        if 'tof_readings' in data.keys() and (self.__args.type == 'tof' or self.__args.type == None):
+            self.write_data(file_name, timestamp, files, 0)
 
-            elif 'thermal_readings' in data.keys():
-                self.write_data(file_name, timestamp, files, 1)
+        elif 'thermal_readings' in data.keys() and (self.__args.type == 'thermal' or self.__args.type == None):
+            self.write_data(file_name, timestamp, files, 1)
 
     def receive_messages(self, rc_time: int = None):
         """Function to receive/handle incoming MQTT messages.

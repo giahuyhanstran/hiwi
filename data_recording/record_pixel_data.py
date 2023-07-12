@@ -1,6 +1,7 @@
 import os
 import yaml
 from utils.mqqt_subscriber import MQTTSubscriber
+import argparse
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -26,15 +27,16 @@ def _get_config(filename='config.yml') -> dict:
 
 
 def main():
-    '''Main method'''
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--include', nargs='+')
+    parser.add_argument('--exclude', nargs='+')
+    parser.add_argument('--type')
+    args = parser.parse_args()
 
-    # get the config
     cfg = _get_config()
-    # initialize MQTT subscriber
-    receiver = MQTTSubscriber(cfg)
-    # receive messages
+    receiver = MQTTSubscriber(cfg, args)
     receiver.receive_messages()
-
 
 if __name__ == '__main__':
     main()
