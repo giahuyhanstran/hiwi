@@ -29,8 +29,8 @@ def _get_config(filename='config.yml') -> dict:
 def main():
     
     parser = argparse.ArgumentParser()
-    parser.add_argument('--include', nargs='+')
-    parser.add_argument('--exclude', nargs='+')
+    parser.add_argument('--include', nargs='+', default= [])
+    parser.add_argument('--exclude', nargs='+', default= [])
     parser.add_argument('--type')
     args = parser.parse_args()
 

@@ -48,16 +48,16 @@ class MQTTSubscriber:
         self.__client.subscribe(self.__topic)
         print('Subscribed to topics...')
 
-    def write_data(self, file_name, timestamp, files, type: int):
+    def write_data(self, file_name, timestamp, files, data: dict, type_index: int):
 
         types = ['tof_readings', 'thermal_readings']
         types_header = ['ToFZ_', 'TZ_']
         with open(self.__path + file_name, 'a', newline='') as f:
             print('Writing to ', file_name)
-            indices = [types_header[type] + str(i) for i in range(len(data[types[type]]))]
+            indices = [types_header[type_index] + str(i) for i in range(len(data[types[type_index]]))]
             indices.append('time')
             indices.append('frame')
-            readings = data[types[type]]
+            readings = data[types[type_index]]
             readings.append(timestamp)
             readings.append(self.__heartbeat)
             data = dict(zip(indices, readings))
@@ -69,7 +69,7 @@ class MQTTSubscriber:
 
     def is_wanted(self, sensor_mac: str, sensor_name: str) -> bool :
 
-        in_is_empty = self.__args.include == None
+        in_is_empty = len(self.__args.include) == 0
         message_in = any(item in self.__args.include for item in [sensor_mac, sensor_name])
         message_out = any(item in self.__args.exclude for item in [sensor_mac, sensor_name])
         
@@ -99,10 +99,6 @@ class MQTTSubscriber:
         payload = yaml.load(str(message.payload.decode("utf-8")), Loader=yaml.FullLoader)
         data = self.__decoder.decode_payload(payload)
 
-        print("message_received: ", payload)
-        print('data_received: ', data)
-        print("message topic: ", message.topic)
-
         sensor_mac = message.topic.split('/')[1]
         sensor_name = self._get_sensor_name(sensor_mac, data)
         timestamp = payload['captured_at']
@@ -114,10 +110,14 @@ class MQTTSubscriber:
             return
         
         if 'tof_readings' in data.keys() and (self.__args.type == 'tof' or self.__args.type == None):
-            self.write_data(file_name, timestamp, files, 0)
+            print("message_received")
+            print("message topic: ", message.topic)
+            self.write_data(file_name, timestamp, files, data, 0)
 
         elif 'thermal_readings' in data.keys() and (self.__args.type == 'thermal' or self.__args.type == None):
-            self.write_data(file_name, timestamp, files, 1)
+            print("message_received")
+            print("message topic: ", message.topic)
+            self.write_data(file_name, timestamp, files, data, 1)
 
     def receive_messages(self, rc_time: int = None):
         """Function to receive/handle incoming MQTT messages.
