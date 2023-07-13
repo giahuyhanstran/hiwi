@@ -28,9 +28,9 @@ def _get_config(filename='config.yml') -> dict:
 
 def main():
     
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--include', nargs='+', default= [])
-    parser.add_argument('--exclude', nargs='+', default= [])
+    parser = argparse.ArgumentParser() #TODO Erklärung
+    parser.add_argument('--include', nargs='+', default=[]) #TODO default auf None setzen
+    parser.add_argument('--exclude', nargs='+', default=[])
     parser.add_argument('--type')
     args = parser.parse_args()
 

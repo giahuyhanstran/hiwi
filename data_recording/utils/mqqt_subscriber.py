@@ -55,13 +55,13 @@ class MQTTSubscriber:
         with open(self.__path + file_name, 'a', newline='') as f:
             print('Writing to ', file_name)
             indices = [types_header[type_index] + str(i) for i in range(len(data[types[type_index]]))]
-            indices.append('time')
+            indices.append('time') #TODO change to columns (naming)
             indices.append('frame')
             readings = data[types[type_index]]
             readings.append(timestamp)
             readings.append(self.__heartbeat)
             data = dict(zip(indices, readings))
-            w = DictWriter(f, fieldnames=data.keys())
+            w = DictWriter(f, fieldnames=data.keys()) #TODO Reihenfolge berücksichtigen, indices nutzen
             if not file_name in files:
                 w.writeheader()
             w.writerow(data)
