@@ -8,33 +8,28 @@ import time
 from os import listdir, makedirs
 from os.path import isfile, join, exists
 from csv import DictWriter
+import json
 
 
 class MQTTSubscriber:
     """A class to connect to the MQTT broker."""
 
     def __init__(self, config: dict, args, path: str = 'matrix_data/'):
-        self.__cfg = config
+        self.__cfg : dict = config
         self.__args = args
         self.__heartbeat = None
-        self.__sensor_types = {'EC:8D:88:35:49:F9': '_foot_new',
-                               'F8:60:BB:C0:58:A6': '_foot_old',
-                               'F0:4C:E9:43:98:AF': 'ToF_right',
-                               'CC:F4:CF:F7:44:85': 'ToF_left'}
-        self.__topic = [
-            (f"chip/{self.__cfg['ZONE_0']['MAC_ADDRESS']}/idle_patientzone", 0),
-            (f"chip/{self.__cfg['ZONE_0']['MAC_ADDRESS']}/data/patient_zone/thermal/event", 0),
-            # (f"chip/{cfg['ZONE_0']['MAC_ADDRESS']}/data/patient_zone/thermal/sub_event", 0),
-            (f"chip/{self.__cfg['ZONE_1']['MAC_ADDRESS']}/idle_patientzone", 0),
-            (f"chip/{self.__cfg['ZONE_1']['MAC_ADDRESS']}/data/patient_zone/thermal/event", 0),
-            (f"chip/{self.__cfg['ZONE_2']['MAC_ADDRESS']}/idle_patientzone", 0),
-            (f"chip/{self.__cfg['ZONE_3']['MAC_ADDRESS']}/idle_patientzone", 0),
-            ("Heartbeat", 0) # subscribe always to "Heartbeat", contains frame counter of rgb camera
-        ]
+        self.__zones: list = [item for item in config if 'ZONE' in item]
+        self.__subtopics: list = self.__cfg['SUBTOPIC']
+        self.__topic: tuple(str, int) = [(f"chip/{self.__cfg[zone]['MAC_ADDRESS']}/{subtopic}", 0) 
+                                         for zone in self.__zones for subtopic in self.__subtopics 
+                                         if self.__is_wanted(self.__cfg[zone]['MAC_ADDRESS'])]
+        self.__topic.append(("heartbeat", 0))
         self.__decoder = PayloadDecoder()
-        self.__path = path
+        self.__path: str = path
         if not exists(self.__path):
-            makedirs(self.__path)
+            makedirs(self.__path)        
+        self.__category: list = self.__cfg['READING']['CATEGORY']
+        self.__column_name: list = self.__cfg['READING']['COLUMN_NAME']
         self.__client: mqtt.Client = mqtt.Client(
             client_id=self.__cfg['MQTT']['USERNAME'] + '_' + str(randint(1, 1000000)))
         self.__client.username_pw_set(username=self.__cfg['MQTT']['USERNAME'], password=self.__cfg['MQTT']['PASSWORD'])
@@ -48,36 +43,48 @@ class MQTTSubscriber:
         self.__client.subscribe(self.__topic)
         print('Subscribed to topics...')
 
-    def write_data(self, file_name, timestamp, files, data: dict, type_index: int):
+    def __write_data(self, file_name: str, timestamp, files: list[str], data: dict, reading: str): #TODO add timestamp datatype
 
-        types = ['tof_readings', 'thermal_readings']
-        types_header = ['ToFZ_', 'TZ_']
         with open(self.__path + file_name, 'a', newline='') as f:
             print('Writing to ', file_name)
-            indices = [types_header[type_index] + str(i) for i in range(len(data[types[type_index]]))]
-            indices.append('time') #TODO change to columns (naming)
-            indices.append('frame')
-            readings = data[types[type_index]]
+            colum_names = [self.__column_name[self.__category.index(reading)] + str(i) for i in range(len(data[reading]))]
+            colum_names.append('time')
+            colum_names.append('frame')
+            readings = data[reading]
             readings.append(timestamp)
             readings.append(self.__heartbeat)
-            data = dict(zip(indices, readings))
-            w = DictWriter(f, fieldnames=data.keys()) #TODO Reihenfolge berücksichtigen, indices nutzen
+            data = dict(zip(colum_names, readings))
+            w = DictWriter(f, fieldnames=data.keys()) # for Py 3.7+ .keys() order is based on insertion and guaranteed the same
             if not file_name in files:
                 w.writeheader()
             w.writerow(data)
             f.close()
 
-    def is_wanted(self, sensor_mac: str, sensor_name: str) -> bool :
-
-        in_is_empty = len(self.__args.include) == 0
-        message_in = any(item in self.__args.include for item in [sensor_mac, sensor_name])
-        message_out = any(item in self.__args.exclude for item in [sensor_mac, sensor_name])
+    def __is_wanted(self, sensor_mac: str) -> bool :
+        """Decides, based off the arguments 'include' and 'exclude' provided (optional), 
+        if the messages of a sensor unit are needed or not.
         
+        Args:
+            sensor_mac: The mac adress of the sensor unit.
+            
+        Returns:
+            True or False, based off, if data of a sensor unit is wanted"""
+
+        sensor_unit_name: str = self._get_sensor_unit_name(sensor_mac)
+        in_is_empty: bool = self.__args.include == None
+        out_is_empty: bool = self.__args.exclude == None
+
+        # default: message is wanted
+        if in_is_empty and out_is_empty:
+            return True
+
         if in_is_empty:
+            message_out: bool = any(item in self.__args.exclude for item in [sensor_mac, sensor_unit_name])
             if not message_out:
                 return True
             return False
         else:
+            message_in: bool = any(item in self.__args.include for item in [sensor_mac, sensor_unit_name])
             if message_in:
                 return True
             return False
@@ -99,25 +106,21 @@ class MQTTSubscriber:
         payload = yaml.load(str(message.payload.decode("utf-8")), Loader=yaml.FullLoader)
         data = self.__decoder.decode_payload(payload)
 
-        sensor_mac = message.topic.split('/')[1]
-        sensor_name = self._get_sensor_name(sensor_mac, data)
+        sensor_mac: str = message.topic.split('/')[1]
         timestamp = payload['captured_at']
 
-        file_name = sensor_name + '.csv'
-        files = [f for f in listdir(self.__path) if isfile(join(self.__path, f))]
-
-        if not self.is_wanted(sensor_mac, sensor_name):
-            return
+        file_name: str = self._get_sensor_name(sensor_mac, data) + '.csv'
+        files: list[str] = [f for f in listdir(self.__path) if isfile(join(self.__path, f))]
         
         if 'tof_readings' in data.keys() and (self.__args.type == 'tof' or self.__args.type == None):
             print("message_received")
             print("message topic: ", message.topic)
-            self.write_data(file_name, timestamp, files, data, 0)
+            self.__write_data(file_name, timestamp, files, data, 'tof_readings')
 
         elif 'thermal_readings' in data.keys() and (self.__args.type == 'thermal' or self.__args.type == None):
             print("message_received")
             print("message topic: ", message.topic)
-            self.write_data(file_name, timestamp, files, data, 1)
+            self.__write_data(file_name, timestamp, files, data, 'thermal_readings')
 
     def receive_messages(self, rc_time: int = None):
         """Function to receive/handle incoming MQTT messages.
@@ -142,9 +145,10 @@ class MQTTSubscriber:
 
             t = Thread(target=_collector())
             t.start()
-
+    
+    #TODO What is this functions use?
     @staticmethod
-    def _get_indices(data: list) -> list:
+    def _get_indices(data: list) -> list: 
         """Method to generate indices (column names) for the csv files.
 
         Args:
@@ -160,23 +164,48 @@ class MQTTSubscriber:
             for j in range(1, max_index + 1):
                 indices.append((i, j))
         return indices
+    
+    def _get_sensor_unit_name(self, sensor_mac: str) -> str:
+        """Extracts the sensor unit name corresponding to it's mac address.
+        If no name exits, ValueError is thrown and None returned.
+        
+        Args:
+            sensor_mac: The mac adress of the sensor unit.
+            
+        Returns:
+            The name of the sensor unit as a string
+        """
+        try:
+            name = None
+            for zone, zone_info in self.__cfg.items():
+                if 'ZONE' in zone and zone_info["MAC_ADDRESS"] == sensor_mac:
+                    name = zone_info["NAME"]
+                    break
+            if name is None:
+                raise ValueError("No name found for the given MAC_ADDRESS.")
+            return name
+        except ValueError as e:
+            print(f"Error: {str(e)}")
+            return None
 
     def _get_sensor_name(self, sensor_mac: str, sensor_data: dict) -> str:
         """Method to extract the name (=type) of the sensor out of the JSON data.
 
         Args:
-            sensor_mac: The mac adress of the sensor.
+            sensor_mac: The mac adress of the sensor unit.
             sensor_data: The actual sensor data/message.
 
         Returns:
             The name of the sensor as a string.
         """
-        keys = sensor_data.keys()
-        sensor_type = self.__sensor_types[sensor_mac]
-        if sensor_type == "_foot_new" or sensor_type == "_foot_old":
-            if "tof_readings" in keys:
-                return 'ToF' + sensor_type
-            else:
-                return 'thermal' + sensor_type
-        else:
-            return sensor_type
+        try:
+            for reading in self.__category:
+                if reading in sensor_data.keys():
+                    index = self.__category.index(reading)
+                    column_name = self.__column_name[index]
+                    return column_name + self._get_sensor_unit_name(sensor_mac)
+
+            raise ValueError("No matching reading category found in sensor_data.keys().")
+        except ValueError as e:
+            print(f"Error: {str(e)}")
+            return ""
