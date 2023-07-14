@@ -31,8 +31,8 @@ def on_message(client, userdata, message):
 
 
 def merge_audio_video(output_file):
-    video_file = f'{current_date}.mp4'
-    audio_file = f'{current_date}.wav'
+    video_file = f'{current_datetime}.mp4'
+    audio_file = f'{current_datetime}.wav'
 
     command = f'ffmpeg -i "{video_file}" -i "{audio_file}" -c:v copy -c:a aac -strict experimental "{output_file}"'
     subprocess.run(command, shell=True)
@@ -56,8 +56,8 @@ def time_check(time_in_seconds):
 if __name__ == '__main__':
     time_done = False
 
-    current_date = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    DIRECTORY = os.path.join(os.getcwd(), current_date)
+    current_datetime = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    DIRECTORY = os.path.join(os.getcwd(), current_datetime)
     if not os.path.exists(DIRECTORY):
         os.makedirs(DIRECTORY)
     os.chdir(DIRECTORY)
@@ -73,8 +73,8 @@ if __name__ == '__main__':
     audio_format = pyaudio.paInt16
     audio_channels = 2
 
-    vw = cv2.VideoWriter(f'{current_date}.mp4', cv2.VideoWriter_fourcc(*"mp4v"), FPS, (FRAME_WIDTH, FRAME_HEIGHT))
-    wf = wave.open(f'{current_date}.wav', 'wb')
+    vw = cv2.VideoWriter(f'{current_datetime}.mp4', cv2.VideoWriter_fourcc(*"mp4v"), FPS, (FRAME_WIDTH, FRAME_HEIGHT))
+    wf = wave.open(f'{current_datetime}.wav', 'wb')
     wf.setnchannels(audio_channels)
     wf.setsampwidth(pyaudio.PyAudio().get_sample_size(audio_format))
     wf.setframerate(audio_sample_rate)
@@ -114,6 +114,6 @@ if __name__ == '__main__':
     vw.release()
     wf.close()
 
-    merge_audio_video(f'{current_date}_merged.mp4')
+    merge_audio_video(f'{current_datetime}_merged.mp4')
 
 
