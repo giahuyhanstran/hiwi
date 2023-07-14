@@ -47,12 +47,8 @@ def main():
     parser.add_argument('--type', type=str, choices=['tof', 'thermal'], help='What kind of data you want to receive of the selected sensor units.')
     args = parser.parse_args()
 
-    print(args.include)
-    print(args.exclude)
-    print(args.type)
-
-    # receiver = MQTTSubscriber(cfg, args)
-    # receiver.receive_messages()
+    receiver = MQTTSubscriber(cfg, args)
+    receiver.receive_messages()
 
 if __name__ == '__main__':
     main()
