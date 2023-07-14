@@ -9,7 +9,10 @@ from os import listdir, makedirs
 from os.path import isfile, join, exists
 from csv import DictWriter
 import json
-
+import uuid
+import struct
+import datetime
+import pandas as pd
 
 class MQTTSubscriber:
     """A class to connect to the MQTT broker."""
@@ -23,7 +26,8 @@ class MQTTSubscriber:
         self.__topic: tuple(str, int) = [(f"chip/{self.__cfg[zone]['MAC_ADDRESS']}/{subtopic}", 0) 
                                          for zone in self.__zones for subtopic in self.__subtopics 
                                          if self.__is_wanted(self.__cfg[zone]['MAC_ADDRESS'])]
-        self.__topic.append(("heartbeat", 0))
+        self.__topic.append(("heartbeat/#", 0))
+        self.__device_uuids : list = []
         self.__decoder = PayloadDecoder()
         self.__path: str = path
         if not exists(self.__path):
@@ -43,6 +47,7 @@ class MQTTSubscriber:
         self.__client.subscribe(self.__topic)
         print('Subscribed to topics...')
 
+    #TODO Use pandas DataFrame (hold in RAM? or use JSON?)
     def __write_data(self, file_name: str, timestamp, files: list[str], data: dict, reading: str): #TODO add timestamp datatype
 
         with open(self.__path + file_name, 'a', newline='') as f:
@@ -89,7 +94,8 @@ class MQTTSubscriber:
                 return True
             return False
 
-    def __on_message(self, client, userdata, message):
+    #TODO Use message_callback_add() to define multiple callbacks that will be called for specific topic filters.
+    def __on_message(self, client, userdata, message): 
         """Function to be triggered when a new message arrives at the client. Decodes new incoming data and saves it to
         the corresponding csv file.
 
@@ -99,8 +105,35 @@ class MQTTSubscriber:
             message: The message (plain JSON) to be decoded and saved.
 
         """
-        if message.topic == "Heartbeat":
-            self.__heartbeat = message.payload.decode("utf-8")
+        if message.topic.split('/')[0] == "heartbeat":
+
+            current_datetime = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")[:-3]
+            device_name = message.topic.split('/')[-1]
+
+            # Unpack payload
+            frame_counter_bytes = message.payload[:4]
+            uuid_bytes = message.payload[4:]            
+            frame_counter = struct.unpack('!I', frame_counter_bytes)[0]
+            uuid_str = str(uuid.UUID(bytes=uuid_bytes))
+
+            if uuid_str in self.__device_uuids:
+                hb_device_counter = f'hb-{self.__device_uuids.index(uuid_str)}'
+            else:
+                self.__device_uuids.append(uuid_str)
+                hb_device_counter = f'hb-{self.__device_uuids.index(uuid_str)}'
+
+            hb_data = {
+                "DEVICE_NAME": device_name,
+                "UUID": uuid_str,
+                "HEARTBEAT": frame_counter
+            }
+
+            json_hb_data = json.dumps(hb_data, indent=4)
+            file_path = f'{self.__path}{hb_device_counter}{current_datetime}.json'
+
+            with open(file_path, 'w') as file:
+                file.write(json_hb_data)
+
             return
         
         payload = yaml.load(str(message.payload.decode("utf-8")), Loader=yaml.FullLoader)
