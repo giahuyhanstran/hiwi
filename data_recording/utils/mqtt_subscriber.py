@@ -21,7 +21,6 @@ class MQTTSubscriber:
     def __init__(self, config: dict, args, path: str = 'matrix_data/'):
         self.__cfg: dict = config
         self.__args = args
-        self.__heartbeat = None
         self.__zones: list = [item for item in config if 'ZONE' in item]
         self.__subtopics: list = self.__cfg['SUBTOPIC']
         self.__topic: list[tuple[str, int]] = [(f"chip/{self.__cfg[zone]['MAC_ADDRESS']}/{subtopic}", 0) 
@@ -40,6 +39,8 @@ class MQTTSubscriber:
             client_id=self.__cfg['MQTT']['USERNAME'] + '_' + str(randint(1, 1000000)))
         self.__client.username_pw_set(username=self.__cfg['MQTT']['USERNAME'], password=self.__cfg['MQTT']['PASSWORD'])
         self.__client.on_message = self.__on_message
+        self.__client.message_callback_add('chip/#', self.__on_message_data)
+        self.__client.message_callback_add('heartbeat/#', self.__on_message_heartbeat)
         # for accessing sensor data from inside smartlab
         self.__client.connect(host=self.__cfg['MQTT']['ADDRESS-L'], port=self.__cfg['MQTT']['PORT'])
         # for accessing data from outside the smartlab via SSH tunnel (using port 1883)
@@ -50,14 +51,16 @@ class MQTTSubscriber:
         print('Subscribed to topics...')
 
     def __is_wanted(self, sensor_mac: str) -> bool :
-        """Decides, based off the arguments 'include' and 'exclude' provided (optional), 
+        """
+        Decides, based off the arguments 'include' and 'exclude' provided (optional), 
         if the messages of a sensor unit are needed or not.
         
         Args:
             sensor_mac: The mac address of the sensor unit.
             
         Returns:
-            True or False, based off, if data of a sensor unit is wanted"""
+            True or False, based off, if data of a sensor unit is wanted.
+        """
 
         sensor_unit_name: str = self._get_sensor_unit_name(sensor_mac)
         in_is_empty: bool = self.__args.include == None
@@ -78,9 +81,12 @@ class MQTTSubscriber:
                 return True
             return False
 
-    #TODO Use message_callback_add() to define multiple callbacks that will be called for specific topic filters.
-    def __on_message(self, client, userdata, message): 
-        """Function to be triggered when a new message arrives at the client. Decodes new incoming data and saves it to
+    def __on_message(self, client, userdata, message):
+        print('Unknown message received')
+        
+    def __on_message_data(self, client, userdata, message): 
+        """
+        Function to be triggered when a new message arrives at the client. Decodes new incoming data and saves it to
         the corresponding csv file.
 
         Args:
@@ -90,9 +96,33 @@ class MQTTSubscriber:
 
         """
         current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")[:-3]
+        payload = yaml.load(str(message.payload.decode("utf-8")), Loader=yaml.FullLoader)
+        data = self.__decoder.decode_payload(payload)
+        reading = 'thermal' if 'thermal_readings' in data.keys() else 'tof'
+        sensor_mac: str = message.topic.split('/')[1]
+        # timestamp = payload['captured_at']
+        sensor_name = self._get_sensor_name(sensor_mac, data)
+                      
+        if not (self.__args.type == reading or self.__args.type == None):
+            return
+        
+        print("message_received")
+        print("message topic: ", message.topic)
 
-        if message.topic.split('/')[0] == "heartbeat":
+        if not sensor_name in self.__dataframes.keys():
+            colum_names = [self.__column_name[self.__category.index(reading)] + str(i) for i in range(len(data[reading]))]
+            colum_names.append('time')
+            self.__dataframes[sensor_name] = pd.DataFrame(columns=colum_names)
 
+        df = self.__dataframes[sensor_name]
+        pixel_data = data[reading + '_readings']
+        pixel_data.append(current_datetime)
+
+        df.loc[len(df)] = pixel_data
+
+    def __on_message_heartbeat(self, client, userdata, message):
+            
+            current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")[:-3]
             device_name = message.topic.split('/')[-1]
 
             # Unpack payload
@@ -123,36 +153,11 @@ class MQTTSubscriber:
 
             return
 
-        payload = yaml.load(str(message.payload.decode("utf-8")), Loader=yaml.FullLoader)
-        data = self.__decoder.decode_payload(payload)
-        reading = 'thermal' if 'thermal_readings' in data.keys() else 'tof'
-        sensor_mac: str = message.topic.split('/')[1]
-        # timestamp = payload['captured_at']
-        sensor_name = self._get_sensor_name(sensor_mac, data)
-                      
-        if not (self.__args.type == reading or self.__args.type == None):
-            return
-        
-        print("message_received")
-        print("message topic: ", message.topic)
-
-        if not sensor_name in self.__dataframes.keys():
-            colum_names = [self.__column_name[self.__category.index(reading)] + str(i) for i in range(len(data[reading]))]
-            colum_names.append('time')
-            self.__dataframes[sensor_name] = pd.DataFrame(columns=colum_names)
-
-        df = self.__dataframes[sensor_name]
-        pixel_data = data[reading + '_readings']
-        pixel_data.append(current_datetime)
-
-        df.loc[len(df)] = pixel_data
-
     def receive_messages(self, rc_time: int = None):
         """Function to receive/handle incoming MQTT messages.
 
         Args:
             rc_time: The time for which you want to record data.
-
         """
         if rc_time is None:
             t = Thread(target=self.__client.loop_forever)
@@ -177,6 +182,19 @@ class MQTTSubscriber:
         self._save_dataframes()
         
     def _find_closest_timestamp(self, input_timestamp, timestamp_list, max_interval: int):
+        """
+        Finds the timestamp in the `timestamp_list` that is closest to the `input_timestamp`.
+
+        Args:
+            input_timestamp (str): The timestamp in the format "%Y-%m-%d_%H-%M-%S-%f" for which the closest timestamp is to be found.
+            timestamp_list (list[str]): A list of timestamps in the format "%Y-%m-%d_%H-%M-%S-%f" to compare with `input_timestamp`.
+            max_interval (int): The maximum interval allowed in seconds. If the time difference between `input_timestamp` and the closest timestamp
+                                is greater than `max_interval`, None is returned.
+
+        Returns:
+            str or None: The timestamp from `timestamp_list` that is closest to `input_timestamp`, or None if the time difference exceeds `max_interval`.
+        """
+
         input_dt = datetime.strptime(input_timestamp, "%Y-%m-%d_%H-%M-%S-%f")
         closest_timestamp = min(timestamp_list, key=lambda x: abs(datetime.strptime(x, "%Y-%m-%d_%H-%M-%S-%f") - input_dt))
         # Calculate the time difference between the input timestamp and the closest timestamp
@@ -217,6 +235,14 @@ class MQTTSubscriber:
                         df.at[index, folder] = heartbeat
 
     def _save_dataframes(self):
+        """
+        The function saves each DataFrame object in a separate CSV file with the name of the sensor in the specified `self.__path`.
+        Note: The index column of the DataFrame is not included in the CSV file.
+        If no dataframes are found, the function will print "No data found." and return.
+
+        Returns:
+            None
+        """
 
         if not self.__dataframes:
             print("No data found.")
@@ -224,27 +250,8 @@ class MQTTSubscriber:
 
         print("Saving data to csv ...")
         for sensor_name in self.__dataframes.keys():
-            file_path = self.__path + sensor_name + 'csv'
+            file_path = self.__path + sensor_name + '.csv'
             self.__dataframes[sensor_name].to_csv(file_path, index=False)
-
-    #TODO What is this functions use?
-    @staticmethod
-    def _get_indices(data: list) -> list: 
-        """Method to generate indices (column names) for the csv files.
-
-        Args:
-            data: The data to be stored.
-
-        Returns:
-            A list with all necessary column names.
-
-        """
-        indices = []
-        max_index = int(sqrt(len(data)))
-        for i in range(1, max_index + 1):
-            for j in range(1, max_index + 1):
-                indices.append((i, j))
-        return indices
     
     def _get_sensor_unit_name(self, sensor_mac: str) -> str:
         """Extracts the sensor unit name corresponding to it's mac address.
@@ -254,7 +261,7 @@ class MQTTSubscriber:
             sensor_mac: The mac address of the sensor unit.
             
         Returns:
-            The name of the sensor unit as a string
+            str: The name of the sensor unit as a string.
         """
         try:
             name = None
@@ -277,7 +284,7 @@ class MQTTSubscriber:
             sensor_data: The actual sensor data/message.
 
         Returns:
-            The name of the sensor as a string.
+            str: The name of the sensor. That includes the type of data and the sensor unit name.
         """
         try:
             for reading in self.__category:
