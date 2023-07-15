@@ -41,7 +41,7 @@ class MQTTSubscriber:
         self.__client.username_pw_set(username=self.__cfg['MQTT']['USERNAME'], password=self.__cfg['MQTT']['PASSWORD'])
         self.__client.on_message = self.__on_message
         # for accessing sensor data from inside smartlab
-        self.__client.connect(host=self.__cfg['MQTT']['ADDRESS'], port=self.__cfg['MQTT']['PORT'])
+        self.__client.connect(host=self.__cfg['MQTT']['ADDRESS-L'], port=self.__cfg['MQTT']['PORT'])
         # for accessing data from outside the smartlab via SSH tunnel (using port 1883)
         # ssh username@elias -N -v -L 1883:192.168.1.80:1883
         # self.__client.connect(host='localhost', port=self.__cfg['MQTT']['PORT'])
@@ -54,7 +54,7 @@ class MQTTSubscriber:
         if the messages of a sensor unit are needed or not.
         
         Args:
-            sensor_mac: The mac adress of the sensor unit.
+            sensor_mac: The mac address of the sensor unit.
             
         Returns:
             True or False, based off, if data of a sensor unit is wanted"""
@@ -89,7 +89,7 @@ class MQTTSubscriber:
             message: The message (plain JSON) to be decoded and saved.
 
         """
-        current_datetime = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")[:-3]
+        current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")[:-3]
 
         if message.topic.split('/')[0] == "heartbeat":
 
@@ -237,7 +237,7 @@ class MQTTSubscriber:
         If no name exits, ValueError is thrown and None returned.
         
         Args:
-            sensor_mac: The mac adress of the sensor unit.
+            sensor_mac: The mac address of the sensor unit.
             
         Returns:
             The name of the sensor unit as a string
@@ -259,7 +259,7 @@ class MQTTSubscriber:
         """Method to extract the name (=type) of the sensor out of the JSON data.
 
         Args:
-            sensor_mac: The mac adress of the sensor unit.
+            sensor_mac: The mac address of the sensor unit.
             sensor_data: The actual sensor data/message.
 
         Returns:
