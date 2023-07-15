@@ -1,6 +1,6 @@
 import os
 import yaml
-from utils.mqqt_subscriber import MQTTSubscriber
+from utils.mqtt_subscriber import MQTTSubscriber
 import argparse
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
