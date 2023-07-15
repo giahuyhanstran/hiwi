@@ -116,7 +116,7 @@ class MQTTSubscriber:
             }
 
             json_hb_data = json.dumps(hb_data, indent=4)
-            file_path = f'{self.__path}/{hb_device_counter}/{current_datetime}.json'
+            file_path = f'{self.__path}hb/{hb_device_counter}/{current_datetime}.json'
 
             with open(file_path, 'w') as file:
                 file.write(json_hb_data)
@@ -172,6 +172,9 @@ class MQTTSubscriber:
 
             t = Thread(target=_collector)
             t.start()
+
+        self._add_heartbeats()
+        self._save_dataframes()
         
     def _find_closest_timestamp(self, input_timestamp, timestamp_list, max_interval: int):
         input_dt = datetime.strptime(input_timestamp, "%Y-%m-%d_%H-%M-%S-%f")
@@ -189,6 +192,13 @@ class MQTTSubscriber:
 
         print('Adding received heartbeats to data ...')
         hb_folder: list[str] = [folder for folder in listdir(self.__path + 'hb/') if not isfile(join(self.__path + 'hb/', folder))]
+
+        if not hb_folder:
+            print("No heartbeats found.")
+            return
+        
+        if not self.__dataframes:
+            return
         
         for sensor_name in self.__dataframes.keys():
             df = self.__dataframes[sensor_name]
@@ -207,6 +217,10 @@ class MQTTSubscriber:
                         df.at[index, folder] = heartbeat
 
     def _save_dataframes(self):
+
+        if not self.__dataframes:
+            print("No data found.")
+            return
 
         print("Saving data to csv ...")
         for sensor_name in self.__dataframes.keys():
