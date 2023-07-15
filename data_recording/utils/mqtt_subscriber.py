@@ -7,27 +7,29 @@ from numpy import sqrt
 import time
 from os import listdir, makedirs
 from os.path import isfile, join, exists
-from csv import DictWriter
 import json
 import uuid
 import struct
-import datetime
+from datetime import datetime, timedelta
+import numpy as np
 import pandas as pd
+import keyboard
 
 class MQTTSubscriber:
     """A class to connect to the MQTT broker."""
 
     def __init__(self, config: dict, args, path: str = 'matrix_data/'):
-        self.__cfg : dict = config
+        self.__cfg: dict = config
         self.__args = args
         self.__heartbeat = None
         self.__zones: list = [item for item in config if 'ZONE' in item]
         self.__subtopics: list = self.__cfg['SUBTOPIC']
-        self.__topic: tuple(str, int) = [(f"chip/{self.__cfg[zone]['MAC_ADDRESS']}/{subtopic}", 0) 
+        self.__topic: list[tuple[str, int]] = [(f"chip/{self.__cfg[zone]['MAC_ADDRESS']}/{subtopic}", 0) 
                                          for zone in self.__zones for subtopic in self.__subtopics 
                                          if self.__is_wanted(self.__cfg[zone]['MAC_ADDRESS'])]
         self.__topic.append(("heartbeat/#", 0))
-        self.__device_uuids : list = []
+        self.__device_uuids: list[str] = []
+        self.__dataframes: dict[str : pd.DataFrame] = {}
         self.__decoder = PayloadDecoder()
         self.__path: str = path
         if not exists(self.__path):
@@ -46,24 +48,6 @@ class MQTTSubscriber:
         print('Connected to MQTT broker...')
         self.__client.subscribe(self.__topic)
         print('Subscribed to topics...')
-
-    #TODO Use pandas DataFrame (hold in RAM? or use JSON?)
-    def __write_data(self, file_name: str, timestamp, files: list[str], data: dict, reading: str): #TODO add timestamp datatype
-
-        with open(self.__path + file_name, 'a', newline='') as f:
-            print('Writing to ', file_name)
-            colum_names = [self.__column_name[self.__category.index(reading)] + str(i) for i in range(len(data[reading]))]
-            colum_names.append('time')
-            colum_names.append('frame')
-            readings = data[reading]
-            readings.append(timestamp)
-            readings.append(self.__heartbeat)
-            data = dict(zip(colum_names, readings))
-            w = DictWriter(f, fieldnames=data.keys()) # for Py 3.7+ .keys() order is based on insertion and guaranteed the same
-            if not file_name in files:
-                w.writeheader()
-            w.writerow(data)
-            f.close()
 
     def __is_wanted(self, sensor_mac: str) -> bool :
         """Decides, based off the arguments 'include' and 'exclude' provided (optional), 
@@ -105,9 +89,10 @@ class MQTTSubscriber:
             message: The message (plain JSON) to be decoded and saved.
 
         """
+        current_datetime = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")[:-3]
+
         if message.topic.split('/')[0] == "heartbeat":
 
-            current_datetime = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")[:-3]
             device_name = message.topic.split('/')[-1]
 
             # Unpack payload
@@ -121,6 +106,8 @@ class MQTTSubscriber:
             else:
                 self.__device_uuids.append(uuid_str)
                 hb_device_counter = f'hb-{self.__device_uuids.index(uuid_str)}'
+                if not exists(f'{self.__path}hb/{hb_device_counter}/'):
+                    makedirs(f'{self.__path}hb/{hb_device_counter}/')
 
             hb_data = {
                 "DEVICE_NAME": device_name,
@@ -129,31 +116,36 @@ class MQTTSubscriber:
             }
 
             json_hb_data = json.dumps(hb_data, indent=4)
-            file_path = f'{self.__path}{hb_device_counter}{current_datetime}.json'
+            file_path = f'{self.__path}/{hb_device_counter}/{current_datetime}.json'
 
             with open(file_path, 'w') as file:
                 file.write(json_hb_data)
 
             return
-        
+
         payload = yaml.load(str(message.payload.decode("utf-8")), Loader=yaml.FullLoader)
         data = self.__decoder.decode_payload(payload)
-
+        reading = 'thermal' if 'thermal_readings' in data.keys() else 'tof'
         sensor_mac: str = message.topic.split('/')[1]
-        timestamp = payload['captured_at']
-
-        file_name: str = self._get_sensor_name(sensor_mac, data) + '.csv'
-        files: list[str] = [f for f in listdir(self.__path) if isfile(join(self.__path, f))]
+        # timestamp = payload['captured_at']
+        sensor_name = self._get_sensor_name(sensor_mac, data)
+                      
+        if not (self.__args.type == reading or self.__args.type == None):
+            return
         
-        if 'tof_readings' in data.keys() and (self.__args.type == 'tof' or self.__args.type == None):
-            print("message_received")
-            print("message topic: ", message.topic)
-            self.__write_data(file_name, timestamp, files, data, 'tof_readings')
+        print("message_received")
+        print("message topic: ", message.topic)
 
-        elif 'thermal_readings' in data.keys() and (self.__args.type == 'thermal' or self.__args.type == None):
-            print("message_received")
-            print("message topic: ", message.topic)
-            self.__write_data(file_name, timestamp, files, data, 'thermal_readings')
+        if not sensor_name in self.__dataframes.keys():
+            colum_names = [self.__column_name[self.__category.index(reading)] + str(i) for i in range(len(data[reading]))]
+            colum_names.append('time')
+            self.__dataframes[sensor_name] = pd.DataFrame(columns=colum_names)
+
+        df = self.__dataframes[sensor_name]
+        pixel_data = data[reading + '_readings']
+        pixel_data.append(current_datetime)
+
+        df.loc[len(df)] = pixel_data
 
     def receive_messages(self, rc_time: int = None):
         """Function to receive/handle incoming MQTT messages.
@@ -163,22 +155,64 @@ class MQTTSubscriber:
 
         """
         if rc_time is None:
-            t = Thread(target=self.__client.loop_forever())
+            t = Thread(target=self.__client.loop_forever)
             t.start()
+            keyboard.wait('s')
+            self.__client.disconnect()
+            self.__client.loop_stop()
         else:
             def _collector():
                 start_time = time.time()
-                run = True
                 self.__client.loop_start()
-                while run:
-                    if time.time() - start_time >= rc_time:
+                while True:
+                    if time.time() - start_time >= rc_time or keyboard.is_pressed('s'):
                         self.__client.disconnect()
                         self.__client.loop_stop()
-                        run = False
+                        break
 
-            t = Thread(target=_collector())
+            t = Thread(target=_collector)
             t.start()
-    
+        
+    def _find_closest_timestamp(self, input_timestamp, timestamp_list, max_interval: int):
+        input_dt = datetime.strptime(input_timestamp, "%Y-%m-%d_%H-%M-%S-%f")
+        closest_timestamp = min(timestamp_list, key=lambda x: abs(datetime.strptime(x, "%Y-%m-%d_%H-%M-%S-%f") - input_dt))
+        # Calculate the time difference between the input timestamp and the closest timestamp
+        time_diff = abs(input_dt - datetime.strptime(closest_timestamp, "%Y-%m-%d_%H-%M-%S-%f"))
+
+        # Check if the time difference exceeds the maximum interval
+        if time_diff > timedelta(seconds=max_interval):
+            return None
+        else:
+            return closest_timestamp
+
+    def _add_heartbeats(self):
+
+        print('Adding received heartbeats to data ...')
+        hb_folder: list[str] = [folder for folder in listdir(self.__path + 'hb/') if not isfile(join(self.__path + 'hb/', folder))]
+        
+        for sensor_name in self.__dataframes.keys():
+            df = self.__dataframes[sensor_name]
+            for folder in hb_folder:
+                df[folder] = None
+                path: str = f'{self.__path}hb/{folder}/'
+                timestamps: list[str] = [file[:-5] for file in listdir(path) if isfile(join(path, file))]
+                for index, timestamp in df['time'].iteritems():
+                    closest_hb = self._find_closest_timestamp(timestamp, timestamps, max_interval=2)
+                    if not closest_hb == None:
+                        file_path = f'{self.__path}hb/{folder}/{closest_hb}.json'
+                        with open(file_path, 'r') as file:
+                            hb_data = json.load(file)
+                        
+                        heartbeat = hb_data['HEARTBEAT']
+                        df.at[index, folder] = heartbeat
+
+    def _save_dataframes(self):
+
+        print("Saving data to csv ...")
+        for sensor_name in self.__dataframes.keys():
+            file_path = self.__path + sensor_name + 'csv'
+            self.__dataframes[sensor_name].to_csv(file_path, index=False)
+
     #TODO What is this functions use?
     @staticmethod
     def _get_indices(data: list) -> list: 
