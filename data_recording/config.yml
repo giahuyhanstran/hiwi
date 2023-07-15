@@ -18,8 +18,8 @@ SUBTOPIC:
 READING:
   # Category and Column_Name have to be ordered
   CATEGORY:
-    - thermal_readings 
-    - tof_readings
+    - thermal
+    - tof
   # Also serves as Prefix of sensor_unit_name (NAME) to get sensor_name -> COLUMN_NAME + NAME
   COLUMN_NAME:
     - TZ_
