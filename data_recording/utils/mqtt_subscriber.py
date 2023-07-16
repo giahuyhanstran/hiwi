@@ -181,30 +181,57 @@ class MQTTSubscriber:
         self._add_heartbeats()
         self._save_dataframes()
         
-    def _find_closest_timestamp(self, input_timestamp, timestamp_list, max_interval: int):
+    def _find_closest_timestamp(self, input_timestamp, timestamp_list, max_interval: int, last_index: int = None) -> tuple[str | None, int | None]:
         """
         Finds the timestamp in the `timestamp_list` that is closest to the `input_timestamp`.
+        Note: the `timestamp_list` is expected to be ordered (asc).
 
         Args:
             input_timestamp (str): The timestamp in the format "%Y-%m-%d_%H-%M-%S-%f" for which the closest timestamp is to be found.
             timestamp_list (list[str]): A list of timestamps in the format "%Y-%m-%d_%H-%M-%S-%f" to compare with `input_timestamp`.
-            max_interval (int): The maximum interval allowed in seconds. If the time difference between `input_timestamp` and the closest timestamp
-                                is greater than `max_interval`, None is returned.
+            max_interval (int): The maximum interval allowed in seconds. If the time difference between `input_timestamp` and the closest timestamp is greater than `max_interval`, (`None`, `last_index`) is returned.
+            last_index (int): Defines start, when searching in `timestamp_list`.
 
         Returns:
-            str or None: The timestamp from `timestamp_list` that is closest to `input_timestamp`, or None if the time difference exceeds `max_interval`.
+            tuple(str | None, int | None): The timestamp from `timestamp_list` that is closest to `input_timestamp`, or None if the time difference exceeds `max_interval`.
+                                           The Index, where the timestamp was found. If not found, it passes the `last_index`, which can be int or None.
         """
 
         input_dt = datetime.strptime(input_timestamp, "%Y-%m-%d_%H-%M-%S-%f")
+
+        if not last_index == None:
+            timestamp_list = timestamp_list[last_index:]
+        
+        hb_found = False
+        # Take advantage of chronological order and slice timestamps from last timestamp to latest possible in the timeline
+        for index, timestamp in enumerate(timestamp_list):
+            timestamp = datetime.strptime(timestamp, "%Y-%m-%d_%H-%M-%S-%f")
+            if timestamp > input_dt + timedelta(seconds=max_interval):
+                timestamp_list = timestamp_list[:index]
+                hb_found = True
+                break
+
+        if not hb_found:
+            # Heartbeats stopped before reaching the next sensor data entry
+            return (None, last_index)
+
         closest_timestamp = min(timestamp_list, key=lambda x: abs(datetime.strptime(x, "%Y-%m-%d_%H-%M-%S-%f") - input_dt))
         # Calculate the time difference between the input timestamp and the closest timestamp
         time_diff = abs(input_dt - datetime.strptime(closest_timestamp, "%Y-%m-%d_%H-%M-%S-%f"))
 
         # Check if the time difference exceeds the maximum interval
+        # Case should never be reached, when heartbeat sends at least once in less than 2*max_interval seconds
         if time_diff > timedelta(seconds=max_interval):
-            return None
+            # No match found
+            return (None, last_index)
         else:
-            return closest_timestamp
+            # Update last_index when matching timestamp found
+            if last_index == None:
+                last_index = timestamp_list.index(closest_timestamp)
+            else:
+                last_index = last_index + timestamp_list.index(closest_timestamp)
+                
+            return (closest_timestamp, last_index)
 
     def _add_heartbeats(self):
 
@@ -224,8 +251,9 @@ class MQTTSubscriber:
                 df[folder] = None
                 path: str = f'{self.__path}hb/{folder}/'
                 timestamps: list[str] = [file[:-5] for file in listdir(path) if isfile(join(path, file))]
+                last_index = None
                 for index, timestamp in df['time'].iteritems():
-                    closest_hb = self._find_closest_timestamp(timestamp, timestamps, max_interval=2)
+                    closest_hb, last_index = self._find_closest_timestamp(timestamp, timestamps, max_interval=1, last_index=last_index)
                     if not closest_hb == None:
                         file_path = f'{self.__path}hb/{folder}/{closest_hb}.json'
                         with open(file_path, 'r') as file:
