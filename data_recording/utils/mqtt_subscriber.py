@@ -33,8 +33,7 @@ class MQTTSubscriber:
         self.__path: str = path
         if not exists(self.__path):
             makedirs(self.__path)        
-        self.__category: list = self.__cfg['READING']['CATEGORY']
-        self.__column_name: list = self.__cfg['READING']['COLUMN_NAME']
+        self.__readings: dict = self.__cfg['READING']
         self.__client: mqtt.Client = mqtt.Client(
             client_id=self.__cfg['MQTT']['USERNAME'] + '_' + str(randint(1, 1000000)))
         self.__client.username_pw_set(username=self.__cfg['MQTT']['USERNAME'], password=self.__cfg['MQTT']['PASSWORD'])
@@ -110,7 +109,7 @@ class MQTTSubscriber:
         print("message topic: ", message.topic)
 
         if not sensor_name in self.__dataframes.keys():
-            colum_names = [self.__column_name[self.__category.index(reading)] + str(i) for i in range(len(data[reading]))]
+            colum_names = [self.__readings[reading.upper()] + str(i) for i in range(len(data[reading + '_readings']))]
             colum_names.append('time')
             self.__dataframes[sensor_name] = pd.DataFrame(columns=colum_names)
 
@@ -230,7 +229,7 @@ class MQTTSubscriber:
                 last_index = timestamp_list.index(closest_timestamp)
             else:
                 last_index = last_index + timestamp_list.index(closest_timestamp)
-                
+
             return (closest_timestamp, last_index)
 
     def _add_heartbeats(self):
@@ -315,10 +314,9 @@ class MQTTSubscriber:
             str: The name of the sensor. That includes the type of data and the sensor unit name.
         """
         try:
-            for reading in self.__category:
-                if reading in sensor_data.keys():
-                    index = self.__category.index(reading)
-                    column_name = self.__column_name[index]
+            for reading in self.__readings.keys():
+                if f'{reading.lower()}_readings' in sensor_data.keys():
+                    column_name = self.__readings[reading]
                     return column_name + self._get_sensor_unit_name(sensor_mac)
 
             raise ValueError("No matching reading category found in sensor_data.keys().")

@@ -14,16 +14,10 @@ SUBTOPIC:
   - idle_patientzone
   - data/patient_zone/thermal/event
 
-#---------- Types of data the sensor units send out
+#---------- Types of data the sensor units send out and their abbreviation
 READING:
-  # Category and Column_Name have to be ordered
-  CATEGORY:
-    - thermal
-    - tof
-  # Also serves as Prefix of sensor_unit_name (NAME) to get sensor_name -> COLUMN_NAME + NAME
-  COLUMN_NAME:
-    - TZ_
-    - ToFZ_
+  THERMAL: TZ_
+  TOF: ToFZ_
 
 #----------- Sensor related config
 FOV:
