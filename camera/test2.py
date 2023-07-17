@@ -2,17 +2,18 @@ import paho.mqtt.client as mqtt
 import time
 import uuid
 import struct
+from random import randint
 
-mqttBroker = "localhost"
+mqttBroker = "192.168.1.80"
 client = mqtt.Client("Topi")
 client.connect(host = mqttBroker, port = 1883)
-uuid_bytes1 = uuid.UUID(str(uuid.uuid4())).bytes
+uuid_bytes1 = uuid.UUID('1aad35ef-4fac-4bf9-ae2f-5b2af6ae5ddd').bytes
 uuid_bytes2 = uuid.UUID(str(uuid.uuid4())).bytes
 frame_counter1 = 0
 frame_counter2 = 1000
 
 topic1 = "heartbeat/device1"
-topic2 = "heartbeat/device2"
+topic2 = f"heartbeat/device{randint(2, 100000)}"
 
 
 while True:
