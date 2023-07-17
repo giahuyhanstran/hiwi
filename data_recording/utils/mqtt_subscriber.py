@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
 import keyboard
+import shutil
 
 class MQTTSubscriber:
     """A class to connect to the MQTT broker."""
@@ -98,12 +99,13 @@ class MQTTSubscriber:
         payload = yaml.load(str(message.payload.decode("utf-8")), Loader=yaml.FullLoader)
         data = self.__decoder.decode_payload(payload)
 
+        # TODO Handle accel data -> data['accel_vector']
         if 'thermal_readings' in data.keys():
             reading = 'thermal'
         elif 'tof_readings' in data.keys():
             reading = 'tof'
         else:
-            return ('Wrong topic')
+            return
 
         sensor_mac: str = message.topic.split('/')[1]
         # timestamp = payload['captured_at']
@@ -189,6 +191,7 @@ class MQTTSubscriber:
         else:
             print("No heartbeats found.")
         self.__save_dataframes()
+        self.__del_heartbeats()
         
     def __find_closest_timestamp(self, input_timestamp, timestamp_list, max_interval: int, last_index: int = None) -> tuple[str | None, int | None]:
         """
@@ -335,3 +338,11 @@ class MQTTSubscriber:
         except ValueError as e:
             print(f"Error: {str(e)}")
             return ""
+
+    def __del_heartbeats(self):
+        path = self.__path + 'hb/'
+        try:
+            shutil.rmtree(path)
+            print(f"Folder '{path}' and its contents deleted successfully.")
+        except OSError as e:
+            print(f"Error deleting folder '{path}': {e}")
