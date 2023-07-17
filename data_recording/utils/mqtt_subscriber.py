@@ -61,7 +61,7 @@ class MQTTSubscriber:
             True or False, based off, if data of a sensor unit is wanted.
         """
 
-        sensor_unit_name: str = self._get_sensor_unit_name(sensor_mac)
+        sensor_unit_name: str = self.__get_sensor_unit_name(sensor_mac)
         in_is_empty: bool = self.__args.include == None
         out_is_empty: bool = self.__args.exclude == None
 
@@ -107,7 +107,7 @@ class MQTTSubscriber:
 
         sensor_mac: str = message.topic.split('/')[1]
         # timestamp = payload['captured_at']
-        sensor_name = self._get_sensor_name(sensor_mac, data)
+        sensor_name = self.__get_sensor_name(sensor_mac, data)
                       
         if not (self.__args.type == reading or self.__args.type == None):
             return
@@ -185,10 +185,12 @@ class MQTTSubscriber:
             t.start()
 
         if self.__device_uuids:
-            self._add_heartbeats()
-        self._save_dataframes()
+            self.__add_heartbeats()
+        else:
+            print("No heartbeats found.")
+        self.__save_dataframes()
         
-    def _find_closest_timestamp(self, input_timestamp, timestamp_list, max_interval: int, last_index: int = None) -> tuple[str | None, int | None]:
+    def __find_closest_timestamp(self, input_timestamp, timestamp_list, max_interval: int, last_index: int = None) -> tuple[str | None, int | None]:
         """
         Finds the timestamp in the `timestamp_list` that is closest to the `input_timestamp`.
         Note: the `timestamp_list` is expected to be ordered (asc).
@@ -203,7 +205,7 @@ class MQTTSubscriber:
             tuple(str | None, int | None): The timestamp from `timestamp_list` that is closest to `input_timestamp`, or None if the time difference exceeds `max_interval`.
                                            The Index, where the timestamp was found. If not found, it passes the `last_index`, which can be int or None.
         """
-
+        og_list = timestamp_list
         input_dt = datetime.strptime(input_timestamp, "%Y-%m-%d_%H-%M-%S-%f")
         if not last_index == None:
             timestamp_list = timestamp_list[last_index:]
@@ -219,6 +221,12 @@ class MQTTSubscriber:
 
         if not hb_found:
             # Heartbeats stopped before reaching the next sensor data entry
+            return (None, last_index)
+
+        #TODO Find cause of "ValueError: min() arg is an empty sequence"
+        if not timestamp_list:
+            print("Timestamp_list is empty")
+            print("original list: ", og_list)
             return (None, last_index)
 
         closest_timestamp = min(timestamp_list, key=lambda x: abs(datetime.strptime(x, "%Y-%m-%d_%H-%M-%S-%f") - input_dt))
@@ -239,7 +247,7 @@ class MQTTSubscriber:
 
             return (closest_timestamp, last_index)
 
-    def _add_heartbeats(self):
+    def __add_heartbeats(self):
 
         print('Adding received heartbeats to data ...')
         hb_folder: list[str] = [folder for folder in listdir(self.__path + 'hb/') if not isfile(join(self.__path + 'hb/', folder))]
@@ -259,7 +267,7 @@ class MQTTSubscriber:
                 timestamps: list[str] = [file[:-5] for file in listdir(path) if isfile(join(path, file))]
                 last_index = None
                 for index, timestamp in df['time'].items():
-                    closest_hb, last_index = self._find_closest_timestamp(timestamp, timestamps, max_interval=1, last_index=last_index)
+                    closest_hb, last_index = self.__find_closest_timestamp(timestamp, timestamps, max_interval=1, last_index=last_index)
                     if not closest_hb == None:
                         file_path = f'{self.__path}hb/{folder}/{closest_hb}.json'
                         with open(file_path, 'r') as file:
@@ -268,7 +276,7 @@ class MQTTSubscriber:
                         heartbeat = hb_data['HEARTBEAT']
                         df.at[index, folder] = heartbeat
 
-    def _save_dataframes(self):
+    def __save_dataframes(self):
         """
         The function saves each DataFrame object in a separate CSV file with the name of the sensor in the specified `self.__path`.
         Note: The index column of the DataFrame is not included in the CSV file.
@@ -287,7 +295,7 @@ class MQTTSubscriber:
             file_path = self.__path + sensor_name + '.csv'
             self.__dataframes[sensor_name].to_csv(file_path, index=False)
     
-    def _get_sensor_unit_name(self, sensor_mac: str) -> str:
+    def __get_sensor_unit_name(self, sensor_mac: str) -> str:
         """Extracts the sensor unit name corresponding to it's mac address.
         If no name exits, ValueError is thrown and None returned.
         
@@ -310,7 +318,7 @@ class MQTTSubscriber:
             print(f"Error: {str(e)}")
             return None
 
-    def _get_sensor_name(self, sensor_mac: str, sensor_data: dict) -> str:
+    def __get_sensor_name(self, sensor_mac: str, sensor_data: dict) -> str:
         """Method to extract the name (=type) of the sensor out of the JSON data.
 
         Args:
@@ -324,7 +332,7 @@ class MQTTSubscriber:
             for reading in self.__readings.keys():
                 if f'{reading.lower()}_readings' in sensor_data.keys():
                     column_name = self.__readings[reading]
-                    return column_name + self._get_sensor_unit_name(sensor_mac)
+                    return column_name + self.__get_sensor_unit_name(sensor_mac)
 
             raise ValueError("No matching reading category found in sensor_data.keys().")
         except ValueError as e:
