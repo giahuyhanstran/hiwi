@@ -41,7 +41,7 @@ class MQTTSubscriber:
         self.__client.message_callback_add('chip/#', self.__on_message_data)
         self.__client.message_callback_add('heartbeat/#', self.__on_message_heartbeat)
         # for accessing sensor data from inside smartlab
-        self.__client.connect(host=self.__cfg['MQTT']['ADDRESS-L'], port=self.__cfg['MQTT']['PORT'])
+        self.__client.connect(host=self.__cfg['MQTT']['ADDRESS'], port=self.__cfg['MQTT']['PORT'])
         # for accessing data from outside the smartlab via SSH tunnel (using port 1883)
         # ssh username@elias -N -v -L 1883:192.168.1.80:1883
         # self.__client.connect(host='localhost', port=self.__cfg['MQTT']['PORT'])
@@ -97,7 +97,14 @@ class MQTTSubscriber:
         current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")[:-3]
         payload = yaml.load(str(message.payload.decode("utf-8")), Loader=yaml.FullLoader)
         data = self.__decoder.decode_payload(payload)
-        reading = 'thermal' if 'thermal_readings' in data.keys() else 'tof'
+
+        if 'thermal_readings' in data.keys():
+            reading = 'thermal'
+        elif 'tof_readings' in data.keys():
+            reading = 'tof'
+        else:
+            return ('Wrong topic')
+
         sensor_mac: str = message.topic.split('/')[1]
         # timestamp = payload['captured_at']
         sensor_name = self._get_sensor_name(sensor_mac, data)
@@ -177,7 +184,8 @@ class MQTTSubscriber:
             t = Thread(target=_collector)
             t.start()
 
-        self._add_heartbeats()
+        if self.__device_uuids:
+            self._add_heartbeats()
         self._save_dataframes()
         
     def _find_closest_timestamp(self, input_timestamp, timestamp_list, max_interval: int, last_index: int = None) -> tuple[str | None, int | None]:
@@ -197,7 +205,6 @@ class MQTTSubscriber:
         """
 
         input_dt = datetime.strptime(input_timestamp, "%Y-%m-%d_%H-%M-%S-%f")
-
         if not last_index == None:
             timestamp_list = timestamp_list[last_index:]
         
@@ -251,7 +258,7 @@ class MQTTSubscriber:
                 path: str = f'{self.__path}hb/{folder}/'
                 timestamps: list[str] = [file[:-5] for file in listdir(path) if isfile(join(path, file))]
                 last_index = None
-                for index, timestamp in df['time'].iteritems():
+                for index, timestamp in df['time'].items():
                     closest_hb, last_index = self._find_closest_timestamp(timestamp, timestamps, max_interval=1, last_index=last_index)
                     if not closest_hb == None:
                         file_path = f'{self.__path}hb/{folder}/{closest_hb}.json'
