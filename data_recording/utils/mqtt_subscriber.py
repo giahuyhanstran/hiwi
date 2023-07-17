@@ -214,19 +214,16 @@ class MQTTSubscriber:
         # Take advantage of chronological order and slice timestamps from last timestamp to latest possible in the timeline
         for index, timestamp in enumerate(timestamp_list):
             timestamp = datetime.strptime(timestamp, "%Y-%m-%d_%H-%M-%S-%f")
+            # Loop until heartbeats occured after input timestamp + intervall, then slice list
             if timestamp > input_dt + timedelta(seconds=max_interval):
                 timestamp_list = timestamp_list[:index]
-                hb_found = True
-                break
+                if timestamp_list:
+                    hb_found = True
+                
+                break                
 
         if not hb_found:
-            # Heartbeats stopped before reaching the next sensor data entry
-            return (None, last_index)
-
-        #TODO Find cause of "ValueError: min() arg is an empty sequence"
-        if not timestamp_list:
-            print("Timestamp_list is empty")
-            print("original list: ", og_list)
+            # Heartbeats lie all before or after the input timestamp +/- max_interval
             return (None, last_index)
 
         closest_timestamp = min(timestamp_list, key=lambda x: abs(datetime.strptime(x, "%Y-%m-%d_%H-%M-%S-%f") - input_dt))
