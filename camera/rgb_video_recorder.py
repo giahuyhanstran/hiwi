@@ -20,7 +20,7 @@ class RGB_Video_Recorder:
         self.__hb_interval: int = args.hb_interval
         self.__video_device: int = self.__cfg['CAMERA']['VIDEO_DEVICE']
         self.__uuid = uuid.UUID(self.__cfg['CAMERA']['UUID']).bytes
-        self.__length = self.__args.length if self.__args.length is not None else None
+        self.__length = self.__args.length
 
         if self.__args.pub_hb or args.pub_data:
             self.__client = mqtt.Client('RGB_Test_Camera' + '_' + str(randint(1, 1000000)))
