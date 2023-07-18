@@ -22,9 +22,9 @@ class RGB_Video_Recorder:
         self.__uuid = uuid.UUID(self.__cfg['CAMERA']['UUID']).bytes
         self.__length = self.__args.length if self.__args.length is not None else None
 
-        if not self.__args.pub_hb and not args.pub_data:
+        if self.__args.pub_hb or args.pub_data:
             self.__client = mqtt.Client('RGB_Test_Camera' + '_' + str(randint(1, 1000000)))
-            self.__client.connect(host='192.168.1.80', port=1883)
+            self.__client.connect(host=self.__cfg['MQTT']['ADDRESS'], port=self.__cfg['MQTT']['PORT'])
 
 
     def __record_video_audio(self):
@@ -72,8 +72,8 @@ class RGB_Video_Recorder:
             frame_counter += 1
             
 
-            if self.__args.length is not None:
-                if frame_counter/FPS >= self.__args.length:
+            if self.__length is not None:
+                if frame_counter/FPS >= self.__length:
                     Done = True
 
             # break condition
