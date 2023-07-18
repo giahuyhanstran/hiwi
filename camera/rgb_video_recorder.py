@@ -27,7 +27,7 @@ class RGB_Video_Recorder:
             self.__client.connect(host=self.__cfg['MQTT']['ADDRESS'], port=self.__cfg['MQTT']['PORT'])
 
 
-    def __record_video_audio(self):
+    def record_video_audio(self):
         cap = cv2.VideoCapture(self.__video_device)
 
         if cap.isOpened():

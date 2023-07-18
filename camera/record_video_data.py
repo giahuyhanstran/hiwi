@@ -43,7 +43,7 @@ def main():
     rgb_cfg = _get_config()
 
     recorder = RGB_Video_Recorder(args, rgb_cfg)
-    recorder.__record_video_audio()
+    recorder.record_video_audio()
 
 
 if __name__ == '__main__':
