@@ -1,5 +1,3 @@
-
-
 #----------- Data source
 READ_FROM: MQTT
 MQTT:
