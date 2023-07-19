@@ -29,7 +29,6 @@ def speech_to_text(input_file):
 
 def create_closed_caption(speech_to_text_file):
     file = f"{current_date}.txt"
-
     my_file = open(file, "r")
     data = my_file.read()
     my_file.close()

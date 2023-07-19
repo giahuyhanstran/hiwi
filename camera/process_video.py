@@ -38,9 +38,6 @@ def merge_audio_video(output_file):
     subprocess.run(command, shell=True)
 
 
-
-
-
 def time_check(time_in_seconds):
     start_time = time.time()
     current_time = time.time()
@@ -115,5 +112,3 @@ if __name__ == '__main__':
     wf.close()
 
     merge_audio_video(f'{current_datetime}_merged.mp4')
-
-
