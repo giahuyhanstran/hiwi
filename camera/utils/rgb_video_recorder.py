@@ -1,4 +1,3 @@
-import argparse
 import cv2
 import pyaudio
 import pickle
@@ -6,6 +5,7 @@ import paho.mqtt.client as mqtt
 from random import randint
 import struct
 import uuid
+from utils.video_processor import Video_Processor
 
 # TODO (if not arg.pub_data) -> save data locally, avoid data chunks and all that
 
@@ -24,7 +24,7 @@ class RGB_Video_Recorder:
 
         if self.__args.pub_hb or args.pub_data:
             self.__client = mqtt.Client('RGB_Test_Camera' + '_' + str(randint(1, 1000000)))
-            self.__client.connect(host=self.__cfg['MQTT']['ADDRESS'], port=self.__cfg['MQTT']['PORT'])
+            self.__client.connect(host=self.__cfg['MQTT']['ADDRESS-L'], port=self.__cfg['MQTT']['PORT'])
 
 
     def record_video_audio(self):
@@ -33,6 +33,9 @@ class RGB_Video_Recorder:
         if cap.isOpened():
             frame_counter = 0
             Done = False
+
+        if not self.__args.pub_data:
+            vp = Video_Processor()
 
         # default settings
         FPS = int(cap.get(cv2.CAP_PROP_FPS))
@@ -65,7 +68,7 @@ class RGB_Video_Recorder:
             if self.__args.pub_data:
                 self.__client.publish("Camera", pickle.dumps(video_data))
             else:
-                pass # save data locally
+                vp.write_data(frame, audio_data)
 
             cv2.imshow("Camera", frame)
 
@@ -88,3 +91,7 @@ class RGB_Video_Recorder:
         stream.stop_stream()
         stream.close()
         p.terminate()
+
+        if not self.__args.pub_data:
+            vp.stop_writer()
+            vp.merge_audio_video()

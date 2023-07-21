@@ -1,6 +1,6 @@
 import argparse
 import ast
-from rgb_video_recorder import RGB_Video_Recorder
+from utils.rgb_video_recorder import RGB_Video_Recorder
 import yaml
 import os
 
