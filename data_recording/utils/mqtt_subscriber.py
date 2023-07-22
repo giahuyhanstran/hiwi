@@ -28,8 +28,8 @@ class MQTTSubscriber:
                                          for zone in self.__zones for subtopic in self.__subtopics 
                                          if self.__is_wanted(self.__cfg[zone]['MAC_ADDRESS'])]
         self.__topic.append(("heartbeat/#", 0))
-        self.__device_uuids: list[str] = []
-        self.__dataframes: dict[str : pd.DataFrame] = {}
+        self.__heartbeats: dict[str : tuple[int, str, str] | None] = {}
+        self.__sensor_names: list[str] = []
         self.__decoder = PayloadDecoder()
         self.__path: str = path
         if not exists(self.__path):
@@ -117,16 +117,24 @@ class MQTTSubscriber:
         print("message_received")
         print("message topic: ", message.topic)
 
-        if not sensor_name in self.__dataframes.keys():
-            colum_names = [self.__readings[reading.upper()] + str(i) for i in range(len(data[reading + '_readings']))]
-            colum_names.append('time')
-            self.__dataframes[sensor_name] = pd.DataFrame(columns=colum_names)
+        if not sensor_name in self.__sensor_names:
+            self.__sensor_names.append(sensor_name)
+            if not exists(f'{self.__path}data/{sensor_name}/'):
+                makedirs(f'{self.__path}data/{sensor_name}/')
 
-        df = self.__dataframes[sensor_name]
-        pixel_data = data[reading + '_readings']
-        pixel_data.append(current_datetime)
+        self.__update_heartbeats(current_datetime, interval=1)
 
-        df.loc[len(df)] = pixel_data
+        sensor_data = {
+            "SENSOR_NAME": sensor_name, 
+            "DATA": data[reading + '_readings'],
+            "HEARTBEATS": self.__heartbeats
+        }
+
+        json_hb_data = json.dumps(sensor_data, indent=4)
+        file_path = f'{self.__path}data/{sensor_name}/{current_datetime}.json'
+
+        with open(file_path, 'w') as file:
+            file.write(json_hb_data)
 
     def __on_message_heartbeat(self, client, userdata, message):
             
@@ -134,33 +142,13 @@ class MQTTSubscriber:
             device_name = message.topic.split('/')[-1]
 
             # Unpack payload
-            frame_counter_bytes = message.payload[:4]
+            frame_bytes = message.payload[:4]
             uuid_bytes = message.payload[4:]            
-            frame_counter = struct.unpack('!I', frame_counter_bytes)[0]
+            frame = struct.unpack('!I', frame_bytes)[0]
             uuid_str = str(uuid.UUID(bytes=uuid_bytes))
 
-            if uuid_str in self.__device_uuids:
-                hb_device_counter = f'hb-{self.__device_uuids.index(uuid_str)}'
-            else:
-                self.__device_uuids.append(uuid_str)
-                hb_device_counter = f'hb-{self.__device_uuids.index(uuid_str)}'
-                if not exists(f'{self.__path}hb/{hb_device_counter}/'):
-                    makedirs(f'{self.__path}hb/{hb_device_counter}/')
-
-            hb_data = {
-                "DEVICE_NAME": device_name,
-                "UUID": uuid_str,
-                "HEARTBEAT": frame_counter
-            }
-
-            json_hb_data = json.dumps(hb_data, indent=4)
-            file_path = f'{self.__path}hb/{hb_device_counter}/{current_datetime}.json'
-
-            with open(file_path, 'w') as file:
-                file.write(json_hb_data)
-
-            return
-
+            self.__heartbeats[uuid_str] = (frame, current_datetime, device_name)
+                
     def receive_messages(self, rc_time: int = None):
         """Function to receive/handle incoming MQTT messages.
 
@@ -186,115 +174,56 @@ class MQTTSubscriber:
             t = Thread(target=_collector)
             t.start()
 
-        if self.__device_uuids:
-            self.__add_heartbeats()
-        else:
-            print("No heartbeats found.")
-        self.__save_dataframes()
-        self.__del_heartbeats()
-        
-    def __find_closest_timestamp(self, input_timestamp, timestamp_list, max_interval: int, last_index: int = None) -> tuple[str | None, int | None]:
-        """
-        Finds the timestamp in the `timestamp_list` that is closest to the `input_timestamp`.
-        Note: the `timestamp_list` is expected to be ordered (asc).
+        self.__json_to_csv()
+        self.__del_json()
+   
+    def __update_heartbeats(self, current_datetime: str, interval: int):
 
-        Args:
-            input_timestamp (str): The timestamp in the format "%Y-%m-%d_%H-%M-%S-%f" for which the closest timestamp is to be found.
-            timestamp_list (list[str]): A list of timestamps in the format "%Y-%m-%d_%H-%M-%S-%f" to compare with `input_timestamp`.
-            max_interval (int): The maximum interval allowed in seconds. If the time difference between `input_timestamp` and the closest timestamp is greater than `max_interval`, (`None`, `last_index`) is returned.
-            last_index (int): Defines start, when searching in `timestamp_list`.
+        current_datetime = datetime.strptime(current_datetime, "%Y-%m-%d_%H-%M-%S-%f")
 
-        Returns:
-            tuple(str | None, int | None): The timestamp from `timestamp_list` that is closest to `input_timestamp`, or None if the time difference exceeds `max_interval`.
-                                           The Index, where the timestamp was found. If not found, it passes the `last_index`, which can be int or None.
-        """
-        og_list = timestamp_list
-        input_dt = datetime.strptime(input_timestamp, "%Y-%m-%d_%H-%M-%S-%f")
-        if not last_index == None:
-            timestamp_list = timestamp_list[last_index:]
-        
-        hb_found = False
-        # Take advantage of chronological order and slice timestamps from last timestamp to latest possible in the timeline
-        for index, timestamp in enumerate(timestamp_list):
-            timestamp = datetime.strptime(timestamp, "%Y-%m-%d_%H-%M-%S-%f")
-            # Loop until heartbeats occured after input timestamp + intervall, then slice list
-            if timestamp > input_dt + timedelta(seconds=max_interval):
-                timestamp_list = timestamp_list[:index]
-                if timestamp_list:
-                    hb_found = True
-                
-                break                
+        for key in self.__heartbeats.keys():
+            time_entry = datetime.strptime(self.__heartbeats[key][1], "%Y-%m-%d_%H-%M-%S-%f")
+            if current_datetime > time_entry + timedelta(seconds=interval):
+                self.__heartbeats[key] = None
 
-        if not hb_found:
-            # Heartbeats lie all before or after the input timestamp +/- max_interval
-            return (None, last_index)
-
-        closest_timestamp = min(timestamp_list, key=lambda x: abs(datetime.strptime(x, "%Y-%m-%d_%H-%M-%S-%f") - input_dt))
-        # Calculate the time difference between the input timestamp and the closest timestamp
-        time_diff = abs(input_dt - datetime.strptime(closest_timestamp, "%Y-%m-%d_%H-%M-%S-%f"))
-
-        # Check if the time difference exceeds the maximum interval
-        # Case should never be reached, when heartbeat sends at least once in less than 2*max_interval seconds
-        if time_diff > timedelta(seconds=max_interval):
-            # No match found
-            return (None, last_index)
-        else:
-            # Update last_index when matching timestamp found
-            if last_index == None:
-                last_index = timestamp_list.index(closest_timestamp)
-            else:
-                last_index = last_index + timestamp_list.index(closest_timestamp)
-
-            return (closest_timestamp, last_index)
-
-    def __add_heartbeats(self):
+    def __json_to_csv(self):
 
         print('Adding received heartbeats to data ...')
-        hb_folder: list[str] = [folder for folder in listdir(self.__path + 'hb/') if not isfile(join(self.__path + 'hb/', folder))]
+        data_folder: list[str] = [folder for folder in listdir(self.__path) if not isfile(join(self.__path, folder))]
 
-        if not hb_folder:
-            print("No heartbeats found.")
-            return
-        
-        if not self.__dataframes:
-            return
-        
-        for sensor_name in self.__dataframes.keys():
-            df = self.__dataframes[sensor_name]
-            for folder in hb_folder:
-                df[folder] = None
-                path: str = f'{self.__path}hb/{folder}/'
-                timestamps: list[str] = [file[:-5] for file in listdir(path) if isfile(join(path, file))]
-                last_index = None
-                for index, timestamp in df['time'].items():
-                    closest_hb, last_index = self.__find_closest_timestamp(timestamp, timestamps, max_interval=1, last_index=last_index)
-                    if not closest_hb == None:
-                        file_path = f'{self.__path}hb/{folder}/{closest_hb}.json'
-                        with open(file_path, 'r') as file:
-                            hb_data = json.load(file)
-                        
-                        heartbeat = hb_data['HEARTBEAT']
-                        df.at[index, folder] = heartbeat
-
-    def __save_dataframes(self):
-        """
-        The function saves each DataFrame object in a separate CSV file with the name of the sensor in the specified `self.__path`.
-        Note: The index column of the DataFrame is not included in the CSV file.
-        If no dataframes are found, the function will print "No data found." and return.
-
-        Returns:
-            None
-        """
-
-        if not self.__dataframes:
+        if not data_folder:
             print("No data found.")
             return
+        
+        for folder in data_folder:
 
-        print("Saving data to csv ...")
-        for sensor_name in self.__dataframes.keys():
-            file_path = self.__path + sensor_name + '.csv'
-            self.__dataframes[sensor_name].to_csv(file_path, index=False)
-    
+            
+            path: str = f'{self.__path}data/{folder}/'
+            data_files: list[str] = [file for file in listdir(path) if isfile(join(path, file))]
+            with open(join(path, data_files[-1]), 'r') as file:
+                payload: dict = json.load(file)
+            pixel_data_len = len(payload['DATA'])
+            hb_device_names = list(payload['HEARTBEATS'].keys())
+            # hol dir device names aller heartbeats aus der letzten json file ... ggf. ändern None in 3-Tupel
+
+            abbreviation = folder.split('_')[0]
+            column_names = [abbreviation + str(i) for i in range(pixel_data_len)]
+            column_names.append('time')
+            column_names.append(hb_device_names)
+            df = pd.DataFrame(columns=column_names)
+
+            for file in data_files:
+                with open(join(path, file), 'r') as file:
+                    payload: dict = json.load(file)
+                data = payload['DATA']
+                data.append(file[:-5])
+                for key in payload['HEARTBEATS'].keys():
+                    data.append(payload['HEARTBEATS'][key][0])
+                
+                df.loc[len(df)] = data
+            
+            df.to_csv(self.__path + folder, index=False)
+
     def __get_sensor_unit_name(self, sensor_mac: str) -> str:
         """Extracts the sensor unit name corresponding to it's mac address.
         If no name exits, ValueError is thrown and None returned.
@@ -339,8 +268,8 @@ class MQTTSubscriber:
             print(f"Error: {str(e)}")
             return ""
 
-    def __del_heartbeats(self):
-        path = self.__path + 'hb/'
+    def __del_json(self):
+        path = self.__path + 'data/'
         try:
             shutil.rmtree(path)
             print(f"Folder '{path}' and its contents deleted successfully.")
