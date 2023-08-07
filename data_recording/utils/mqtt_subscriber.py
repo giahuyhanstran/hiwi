@@ -212,15 +212,12 @@ class MQTTSubscriber:
             df = pd.DataFrame(columns=column_names)
 
             for file in data_files:
-                print(file)
                 with open(join(path, file), 'r') as item:
                     payload: dict = json.load(item)
                 data = payload['DATA']
                 data.append(file[:-5])
                 for key in payload['HEARTBEATS'].keys():
                     data.append(payload['HEARTBEATS'][key][0])
-                print((data))
-                print((column_names))
                 
                 df.loc[len(df)] = data
             
