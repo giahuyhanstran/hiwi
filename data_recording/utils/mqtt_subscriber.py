@@ -28,7 +28,7 @@ class MQTTSubscriber:
                                          for zone in self.__zones for subtopic in self.__subtopics 
                                          if self.__is_wanted(self.__cfg[zone]['MAC_ADDRESS'])]
         self.__topic.append(("heartbeat/#", 0))
-        self.__heartbeats: dict[str : tuple[int, str, str] | None] = {}
+        self.__heartbeats: dict[str, tuple[int, str, str] | None] = {}
         self.__sensor_names: list[str] = []
         self.__decoder = PayloadDecoder()
         self.__path: str = path
