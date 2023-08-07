@@ -189,7 +189,7 @@ class MQTTSubscriber:
     def __json_to_csv(self):
 
         print('Adding received heartbeats to data ...')
-        data_folder: list[str] = [folder for folder in listdir(self.__path) if not isfile(join(self.__path, folder))]
+        data_folder: list[str] = [folder for folder in listdir(f'{self.__path}data/') if not isfile(join(self.__path, folder))]
 
         if not data_folder:
             print("No data found.")
@@ -197,32 +197,34 @@ class MQTTSubscriber:
         
         for folder in data_folder:
 
-            
             path: str = f'{self.__path}data/{folder}/'
             data_files: list[str] = [file for file in listdir(path) if isfile(join(path, file))]
             with open(join(path, data_files[-1]), 'r') as file:
                 payload: dict = json.load(file)
             pixel_data_len = len(payload['DATA'])
-            hb_device_names = list(payload['HEARTBEATS'].keys())
+            hb_device_names: list = payload['HEARTBEATS'].keys()
             # hol dir device names aller heartbeats aus der letzten json file ... ggf. ändern None in 3-Tupel
 
             abbreviation = folder.split('_')[0]
             column_names = [abbreviation + str(i) for i in range(pixel_data_len)]
             column_names.append('time')
-            column_names.append(hb_device_names)
+            column_names.extend(hb_device_names)
             df = pd.DataFrame(columns=column_names)
 
             for file in data_files:
-                with open(join(path, file), 'r') as file:
-                    payload: dict = json.load(file)
+                print(file)
+                with open(join(path, file), 'r') as item:
+                    payload: dict = json.load(item)
                 data = payload['DATA']
                 data.append(file[:-5])
                 for key in payload['HEARTBEATS'].keys():
                     data.append(payload['HEARTBEATS'][key][0])
+                print((data))
+                print((column_names))
                 
                 df.loc[len(df)] = data
             
-            df.to_csv(self.__path + folder, index=False)
+            df.to_csv(self.__path + folder + '.csv', index=False)
 
     def __get_sensor_unit_name(self, sensor_mac: str) -> str:
         """Extracts the sensor unit name corresponding to it's mac address.
