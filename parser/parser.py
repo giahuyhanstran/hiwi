@@ -5,7 +5,7 @@ import argparse
 import datetime
 import base64
 
-EXAMPLE_DATA = '($sensfloor-event (!EventMillis 1442903962782l) (!EventType ($sensfloor-event-type MESSAGE_RECEIVED)) (!Message ($sensfloor-sensor-change-message (!RawMessage |/QE1CgUAAAFIBwAGAAEEAAI=|))))'
+EXAMPLE_DATA = '($sensfloor-event (!EventMillis 1442903959250l) (!EventType ($sensfloor-event-type MESSAGE_RECEIVED)) (!Message ($sensfloor-generic-message (!RawMessage |/QE1AAACp4KnAACAAAE1gAA=|))))'
 
 
 # python parser.py --sensfloordata '(:event 0 ((!EventMillis 1330330108324l) (!EventType MESSAGE_RECEIVED) (!Message ((!RawMessage |/QE1AQQAAAAtAAAAAAIBAAU=|)))) ($filter/atomic))'
