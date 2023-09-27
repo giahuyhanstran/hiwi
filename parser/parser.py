@@ -7,8 +7,35 @@ import base64
 
 EXAMPLE_DATA = '($sensfloor-event (!EventMillis 1442903959250l) (!EventType ($sensfloor-event-type MESSAGE_RECEIVED)) (!Message ($sensfloor-generic-message (!RawMessage |/QE1AAACp4KnAACAAAE1gAA=|))))'
 
-
 # python parser.py --sensfloordata '(:event 0 ((!EventMillis 1330330108324l) (!EventType MESSAGE_RECEIVED) (!Message ((!RawMessage |/QE1AQQAAAAtAAAAAAIBAAU=|)))) ($filter/atomic))'
+
+DATA = [
+
+    '($sensfloor-event (!EventMillis 1442903959250l) (!EventType ($sensfloor-event-type MESSAGE_RECEIVED)) (!Message ($sensfloor-generic-message (!RawMessage |/QE1AAACp4KnAACAAAE1gAA=|))))'
+    '($sensfloor-event (!EventMillis 1442903960116l) (!EventType ($sensfloor-event-type MESSAGE_RECEIVED)) (!Message ($sensfloor-sensor-change-message (!RawMessage |/QE1BQMAAAHfAAAAJwYAAgA=|))))',
+    '($sensfloor-event (!EventMillis 1442903960212l) (!EventType ($sensfloor-event-type MESSAGE_RECEIVED)) (!Message ($sensfloor-sensor-change-message (!RawMessage |/QE1BQMIAAHfAAAAVA0BAwA=|))))',
+    '($sensfloor-event (!EventMillis 1442903960328l) (!EventType ($sensfloor-event-type MESSAGE_RECEIVED)) (!Message ($sensfloor-sensor-change-message (!RawMessage |/QE1BQMIAAHfAAAAfRsHAwA=|))))',
+    '($sensfloor-event (!EventMillis 1442903960432l) (!EventType ($sensfloor-event-type MESSAGE_RECEIVED)) (!Message ($sensfloor-sensor-change-message (!RawMessage |/QE1BQMIAADfAAAAfhsHAgA=|))))',
+]
+
+
+def extract_msg():
+    file_path = 'SensFloor_1442903957972.txt'
+    list_of_msg = []
+    try:
+        with open(file_path, 'r') as file:
+            for line in file:
+                comma_index = line.find(',')
+                if comma_index != -1:
+                    list_of_msg.append(line[comma_index + 1:].strip())
+                else:
+                    print("No comma found in this line:", line.strip())
+    except FileNotFoundError:
+        print(f"The file '{file_path}' was not found.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+    return list_of_msg
 
 
 def parse_event_string(event_string):
@@ -51,13 +78,13 @@ def decode_base64_to_hex_list(result):
 
 
 def decode_message(byte_list, result):
+
     msg_byte_list = byte_list[1:9]
     data_byte_list = byte_list[9:17]
 
-
     # fd indicates Message
     if not (byte_list[0] == 'fd'):
-        raise ValueError('invade Message')
+        raise ValueError('invalid Message')
 
     else:
         # MESSAGE 00-07
@@ -98,7 +125,7 @@ def decode_message(byte_list, result):
         Read the friendly manual for further information
         '''
         match result['PARA']:
-            #---READ-ONLY___#
+            # ---READ-ONLY___#
             case '00':
                 # TODO from hexa to byte
                 # Normalized capacity of the
@@ -170,18 +197,12 @@ def decode_message(byte_list, result):
                 for index, value in enumerate(data_byte_list):
                     result[f'byte{index}'] = data_byte_list[index]
 
-
-
-
-
         # TODO content length varies depending on PARA
-
 
         return result
 
 
 if __name__ == '__main__':
-    current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
     parser = argparse.ArgumentParser(description='optional String input')
     parser.add_argument('--sensfloordata', type=str, help='data key value')
@@ -190,10 +211,13 @@ if __name__ == '__main__':
     sensfloordata = args.sensfloordata if args.sensfloordata is not None else EXAMPLE_DATA
 
     # parsed_data = parse_event_string(sensfloordata)
-    decoded_data = decode_message(decode_base64_to_hex_list(parse_event_string(sensfloordata)),
-                                 (parse_event_string(sensfloordata)))
+    for data in extract_msg():
 
-    # with open(os.path.join(os.getcwd(), 'json_folder', f"parsed_data_{current_time}.json"), 'w') as js:
-    #    json.dump(parsed_data, js, indent=4)
-    with open(os.path.join(os.getcwd(), 'json_folder', f"decoded_data_{current_time}.json"), 'w') as js:
-        json.dump(decoded_data, js, indent=1)
+        decoded_data = decode_message(decode_base64_to_hex_list(parse_event_string(data)),
+                                      (parse_event_string(data)))
+        date = decoded_data['event_millis']
+
+        # with open(os.path.join(os.getcwd(), 'json_folder', f"parsed_data_{current_time}.json"), 'w') as js:
+        #    json.dump(parsed_data, js, indent=4)
+        with open(os.path.join(os.getcwd(), 'json_folder', f"decoded_data_{date}.json"), 'w') as js:
+            json.dump(decoded_data, js, indent=1)
