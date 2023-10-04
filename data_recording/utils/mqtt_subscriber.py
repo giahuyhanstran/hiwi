@@ -42,7 +42,7 @@ class MQTTSubscriber:
         self.__client.message_callback_add('chip/#', self.__on_message_data)
         self.__client.message_callback_add('heartbeat/#', self.__on_message_heartbeat)
         # for accessing sensor data from inside smartlab
-        self.__client.connect(host=self.__cfg['MQTT']['ADDRESS'], port=self.__cfg['MQTT']['PORT'])
+        self.__client.connect(host=self.__cfg['MQTT']['ADDRESS-L'], port=self.__cfg['MQTT']['PORT'])
         # for accessing data from outside the smartlab via SSH tunnel (using port 1883)
         # ssh username@elias -N -v -L 1883:192.168.1.80:1883
         # self.__client.connect(host='localhost', port=self.__cfg['MQTT']['PORT'])

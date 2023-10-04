@@ -22,7 +22,7 @@ def on_message(client, userdata, message):
 
 if __name__ == '__main__':
 
-    mqttBroker = "192.168.1.80"
+    mqttBroker = "localhost"
     client = mqtt.Client("Lapi")
     client.on_message = on_message
     client.connect(host = mqttBroker, port = 1883)
