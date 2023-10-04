@@ -32,8 +32,9 @@ class MQTTSubscriber:
         self.__sensor_names: list[str] = []
         self.__decoder = PayloadDecoder()
         self.__path: str = path
-        if not exists(self.__path):
-            makedirs(self.__path)        
+        if exists(self.__path):
+            shutil.rmtree(self.__path)
+        makedirs(self.__path)        
         self.__readings: dict = self.__cfg['READING']
         self.__client: mqtt.Client = mqtt.Client(
             client_id=self.__cfg['MQTT']['USERNAME'] + '_' + str(randint(1, 1000000)))
@@ -119,8 +120,8 @@ class MQTTSubscriber:
 
         if not sensor_name in self.__sensor_names:
             self.__sensor_names.append(sensor_name)
-            if not exists(f'{self.__path}data/{sensor_name}/'):
-                makedirs(f'{self.__path}data/{sensor_name}/')
+            if not exists(f'{self.__path}{sensor_name}/'):
+                makedirs(f'{self.__path}{sensor_name}/')
 
         self.__update_heartbeats(current_datetime, interval=1)
 
@@ -131,7 +132,7 @@ class MQTTSubscriber:
         }
 
         json_hb_data = json.dumps(sensor_data, indent=4)
-        file_path = f'{self.__path}data/{sensor_name}/{current_datetime}.json'
+        file_path = f'{self.__path}{sensor_name}/{current_datetime}.json'
 
         with open(file_path, 'w') as file:
             file.write(json_hb_data)
@@ -147,7 +148,7 @@ class MQTTSubscriber:
             frame = struct.unpack('!I', frame_bytes)[0]
             uuid_str = str(uuid.UUID(bytes=uuid_bytes))
 
-            self.__heartbeats[uuid_str] = (frame, current_datetime, device_name)
+            self.__heartbeats[uuid_str] = [frame, current_datetime, device_name]
                 
     def receive_messages(self, rc_time: int = None):
         """Function to receive/handle incoming MQTT messages.
@@ -184,12 +185,17 @@ class MQTTSubscriber:
         for key in self.__heartbeats.keys():
             time_entry = datetime.strptime(self.__heartbeats[key][1], "%Y-%m-%d_%H-%M-%S-%f")
             if current_datetime > time_entry + timedelta(seconds=interval):
-                self.__heartbeats[key] = None
+                self.__heartbeats[key][0] = None
 
     def __json_to_csv(self):
 
+        current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        csv_path = f"sensor_data_{current_datetime}"
+        if not exists(csv_path):
+            makedirs(csv_path)
+
         print('Adding received heartbeats to data ...')
-        data_folder: list[str] = [folder for folder in listdir(f'{self.__path}data/') if not isfile(join(self.__path, folder))]
+        data_folder: list[str] = [folder for folder in listdir(f'{self.__path}') if not isfile(join(self.__path, folder))]
 
         if not data_folder:
             print("No data found.")
@@ -197,13 +203,15 @@ class MQTTSubscriber:
         
         for folder in data_folder:
 
-            path: str = f'{self.__path}data/{folder}/'
+            path: str = f'{self.__path}{folder}/'
             data_files: list[str] = [file for file in listdir(path) if isfile(join(path, file))]
+            
+            # TODO load last file, because this contains all Heartbeats that emerged during recording
+            # TODO problem: what if last message does not contain all data points? e.g. 4 instead of 9 (3x3)
             with open(join(path, data_files[-1]), 'r') as file:
                 payload: dict = json.load(file)
             pixel_data_len = len(payload['DATA'])
             hb_device_names: list = payload['HEARTBEATS'].keys()
-            # hol dir device names aller heartbeats aus der letzten json file ... ggf. ändern None in 3-Tupel
 
             abbreviation = folder.split('_')[0]
             column_names = [abbreviation + str(i) for i in range(pixel_data_len)]
@@ -217,11 +225,10 @@ class MQTTSubscriber:
                 data = payload['DATA']
                 data.append(file[:-5])
                 for key in payload['HEARTBEATS'].keys():
-                    data.append(payload['HEARTBEATS'][key][0])
-                
+                    data.append(payload['HEARTBEATS'][key][0])                                                        
                 df.loc[len(df)] = data
             
-            df.to_csv(self.__path + folder + '.csv', index=False)
+            df.to_csv(f"{csv_path}/{folder}.csv", index=False)
 
     def __get_sensor_unit_name(self, sensor_mac: str) -> str:
         """Extracts the sensor unit name corresponding to it's mac address.
@@ -268,9 +275,8 @@ class MQTTSubscriber:
             return ""
 
     def __del_json(self):
-        path = self.__path + 'data/'
         try:
-            shutil.rmtree(path)
-            print(f"Folder '{path}' and its contents deleted successfully.")
+            shutil.rmtree(self.__path)
+            print(f"Folder '{self.__path}' and its contents have been successfully deleted.")
         except OSError as e:
-            print(f"Error deleting folder '{path}': {e}")
+            print(f"Error deleting folder '{self.__path}': {e}")
