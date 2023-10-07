@@ -4,6 +4,7 @@ from tkinter import messagebox
 import subprocess
 import os
 import yaml
+import shlex
 
 def validate_config_file(file_path):
     try:
@@ -43,8 +44,9 @@ def run_script():
     # Get the directory where the main.py script is located
     script_directory = os.path.dirname(os.path.abspath(__file__))
     
-    # Set the path to record_pixel_data.py in the same directory
-    script_path = os.path.join(script_directory, "record_pixel_data.py")
+    # Set the path to record_pixel_data.py and record_video_data.py
+    script_path = os.path.join(script_directory, "data_recording\\record_pixel_data.py")
+    script_path_video = os.path.join(script_directory, "camera\\record_video_data.py")
     
     if not os.path.exists(script_path):
         messagebox.showerror("Error", "record_pixel_data.py not found in the same directory.")
@@ -56,14 +58,13 @@ def run_script():
         config_valid_label.config(text="File is invalid", fg="red")
         return
     
-    # Run your Python script as a subprocess
+    # Run Python script as a subprocess
     try:
         include_choices = ' '.join([include_var.get(index) for index in include_var.curselection()])
         exclude_choices = ' '.join([exclude_var.get(index) for index in exclude_var.curselection()])
         type_choices = ' '.join([type_var.get(index) for index in type_var.curselection()]).lower()
-        command = f"python {script_path} --cfg {config_file}"
-
-        print(include_choices)
+        command = fr"python {script_path} --cfg {config_file}"
+        
 
         if include_choices:
             command = command + f" --include {include_choices}"
@@ -72,9 +73,20 @@ def run_script():
         if type_choices:
             command = command + f" --type {type_choices}"
 
-        print(command)
-        subprocess.run(command)
+        pub_hb = str(pub_hb_var.get())
+        pub_data = str(pub_data_var.get())
         
+        # pub_data = 
+        command2 = fr"python {script_path_video} --pub_hb {pub_hb} --pub_data {pub_data}"
+
+        command = command.replace("\\", "/")
+        command2 = command2.replace("\\", "/")
+        command_list = shlex.split(command)
+        command_list2 = shlex.split(command2)
+
+        subprocess.Popen(command_list)
+        subprocess.Popen(command_list2)
+
     except Exception as e:
         messagebox.showerror("Error", f"Error executing script: {str(e)}")
 
@@ -99,6 +111,8 @@ def render_menu(config_file_path):
     global type_var
     global center
     global menu_frame
+    global pub_hb_var
+    global pub_data_var
 
     menu_frame = tk.Frame(root)
     menu_frame.pack()
@@ -133,6 +147,22 @@ def render_menu(config_file_path):
         type_var.insert(tk.END, choice)
     type_var.grid(row=center+3, column=center+1)
 
+    # Create options for video recording
+    pub_hb_label = tk.Label(menu_frame, text="Publish heartbeat?")
+    pub_hb_label.grid(row=center+2, column=center+2)
+    pub_hb_var = tk.BooleanVar()
+    pub_hb_var.set(True)
+    pub_hb_checkbutton = tk.Checkbutton(menu_frame, text="Yes", variable=pub_hb_var)
+    pub_hb_checkbutton.grid(row=center+3, column=center+2)
+
+
+    pub_data_label = tk.Label(menu_frame, text="Publish video data?")
+    pub_data_label.grid(row=center+2, column=center+3)
+    pub_data_var = tk.BooleanVar()
+    pub_data_checkbutton = tk.Checkbutton(menu_frame, text="Yes", variable=pub_data_var)
+    pub_data_checkbutton.grid(row=center+3, column=center+3)
+
+    # Button to run scripts
     run_button = tk.Button(menu_frame, text="Run Script", command=run_script)
     run_button.grid(row=center+4, column=center)
 
@@ -159,6 +189,8 @@ if __name__ == '__main__':
     include_var = None
     exclude_var = None
     type_var = None
+    pub_hb_var = None
+    pub_data_var = None
     config_file_entry = None
 
     # Create the main window
