@@ -177,7 +177,7 @@ def render_file_selection():
     config_file_label = tk.Label(file_selection_frame, text="Config File Path:")
     config_file_label.grid(row=center, column=center-1)
 
-    config_file_entry = tk.Entry(file_selection_frame, width= 50)
+    config_file_entry = tk.Entry(file_selection_frame, width=60)
     config_file_entry.grid(row=center, column=center)
 
     browse_button = tk.Button(file_selection_frame, text="Browse", command=browse_config_file)
@@ -217,11 +217,12 @@ if __name__ == '__main__':
 
     render_file_selection()
 
-    # Get the directory where the gui.py script is located
-    script_directory = os.path.dirname(os.path.abspath(__file__))
-        
+    # Get the directory where the config.yaml script is located
+    main_dir = os.path.dirname(os.path.abspath(__file__))
+    data_recording_dir = os.path.join(main_dir, "data_recording")
+    
     # Check if a config.yml file exists in the same directory
-    config_file_path = os.path.join(script_directory, "config.yml")
+    config_file_path = os.path.join(data_recording_dir, "config.yml")
         
     if os.path.exists(config_file_path):
         config_file_entry.insert(0, config_file_path)
