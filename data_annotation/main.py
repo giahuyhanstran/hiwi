@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import ttk
 from tkinter import filedialog
 from tkinter import messagebox
 import subprocess
@@ -115,56 +116,58 @@ def render_menu(config_file_path):
     global pub_data_var
 
     menu_frame = tk.Frame(root)
+    menu_frame.configure(bg='gray20')
     menu_frame.pack()
 
-    # Create the include dropdown menu based on config.yml
-    include_label = tk.Label(menu_frame, text="Include:")
-    include_label.grid(row=center+2, column=center-1)
+    separator_frame = tk.Frame(menu_frame, height=2, bg="white")
+    separator_frame.grid(row=center+7, column=0, columnspan=10, sticky="ew", pady=30)
 
+    # Create the include dropdown menu based on config.yml
     include_choices = get_include_exclude_choices(config_file_path)
-    include_var = tk.Listbox(menu_frame, selectmode=tk.MULTIPLE, height=len(include_choices), exportselection=0)
+    exclude_choices = include_choices
+    type_choices = get_type_choices(config_file_path)
+
+    max_choices = max((len(include_choices), len(type_choices)))
+
+    include_label = tk.Label(menu_frame, text="Include:", fg='white', bg='gray20')
+    include_label.grid(row=center+4, column=center-1)
+    include_var = tk.Listbox(menu_frame, selectmode=tk.MULTIPLE, height=max_choices, exportselection=0, fg='white', bg='gray20', highlightbackground='gray40', borderwidth=5)
     for choice in include_choices:
         include_var.insert(tk.END, choice)
-    include_var.grid(row=center+3, column=center-1)
+    include_var.grid(row=center+5, column=center-1, padx=20)
 
-    # Create the exclude dropdown menu based on config.yml
-    exclude_label = tk.Label(menu_frame, text="Exclude:")
-    exclude_label.grid(row=center+2, column=center)
-
-    exclude_choices = get_include_exclude_choices(config_file_path)
-    exclude_var = tk.Listbox(menu_frame, selectmode=tk.MULTIPLE, height=len(exclude_choices), exportselection=0)
+    exclude_label = tk.Label(menu_frame, text="Exclude:", fg='white', bg='gray20')
+    exclude_label.grid(row=center+4, column=center)
+    exclude_var = tk.Listbox(menu_frame, selectmode=tk.MULTIPLE, height=max_choices, exportselection=0, fg='white', bg='gray20', highlightbackground='gray40',  borderwidth=5)
     for choice in exclude_choices:
         exclude_var.insert(tk.END, choice)
-    exclude_var.grid(row=center+3, column=center)
+    exclude_var.grid(row=center+5, column=center, padx=20)
 
-    # Create the type dropdown menu based on config.yml
-    type_label = tk.Label(menu_frame, text="Type:")
-    type_label.grid(row=center+2, column=center+1)
-
-    type_choices = get_type_choices(config_file_path)
-    type_var = tk.Listbox(menu_frame, selectmode=tk.SINGLE, height=len(type_choices), exportselection=0)
+    type_label = tk.Label(menu_frame, text="Types:", fg='white', bg='gray20')
+    type_label.grid(row=center+4, column=center+1)
+    type_var = tk.Listbox(menu_frame, selectmode=tk.MULTIPLE, height=max_choices, exportselection=0, fg='white', bg='gray20', highlightbackground='gray40', borderwidth=5)
     for choice in type_choices:
         type_var.insert(tk.END, choice)
-    type_var.grid(row=center+3, column=center+1)
+    type_var.grid(row=center+5, column=center+1, padx=20)
 
     # Create options for video recording
-    pub_hb_label = tk.Label(menu_frame, text="Publish heartbeat?")
-    pub_hb_label.grid(row=center+2, column=center+2)
+    pub_hb_label = tk.Label(menu_frame, text="Publish heartbeat?", fg='white', bg='gray20')
+    pub_hb_label.grid(row=center+8, column=center+1)
     pub_hb_var = tk.BooleanVar()
     pub_hb_var.set(True)
-    pub_hb_checkbutton = tk.Checkbutton(menu_frame, text="Yes", variable=pub_hb_var)
-    pub_hb_checkbutton.grid(row=center+3, column=center+2)
+    pub_hb_checkbutton = tk.Checkbutton(menu_frame, text="Yes", variable=pub_hb_var, selectcolor='gray20', fg='white', bg='gray20', activebackground="gray20", activeforeground="white")
+    pub_hb_checkbutton.grid(row=center+9, column=center+1)
 
 
-    pub_data_label = tk.Label(menu_frame, text="Publish video data?")
-    pub_data_label.grid(row=center+2, column=center+3)
+    pub_data_label = tk.Label(menu_frame, text="Publish video data?", fg='white', bg='gray20')
+    pub_data_label.grid(row=center+8, column=center-1)
     pub_data_var = tk.BooleanVar()
-    pub_data_checkbutton = tk.Checkbutton(menu_frame, text="Yes", variable=pub_data_var)
-    pub_data_checkbutton.grid(row=center+3, column=center+3)
+    pub_data_checkbutton = tk.Checkbutton(menu_frame, text="Yes", variable=pub_data_var, selectcolor='gray20', fg='white', bg='gray20', activebackground="gray20", activeforeground="white")
+    pub_data_checkbutton.grid(row=center+9, column=center-1)
 
     # Button to run scripts
-    run_button = tk.Button(menu_frame, text="Run Script", command=run_script)
-    run_button.grid(row=center+4, column=center)
+    run_button = tk.Button(menu_frame, text="Start annotation", command=run_script, fg='white', bg='gray20')
+    run_button.grid(row=center+10, column=center)
 
 def render_file_selection():
 
@@ -174,14 +177,23 @@ def render_file_selection():
 
     menu_frame.destroy()
 
-    config_file_label = tk.Label(file_selection_frame, text="Config File Path:")
-    config_file_label.grid(row=center, column=center-1)
+    padding_next_to_valid_label = tk.Label(file_selection_frame, text="", bg='gray20')
+    padding_next_to_valid_label.grid(row=center-1, column=center-1, padx=27)
 
-    config_file_entry = tk.Entry(file_selection_frame, width=60)
+    padding_below_valid_label = tk.Label(file_selection_frame, text="", bg='gray20')
+    padding_below_valid_label.grid(row=center+2, column=center, pady=10)
+
+    padding_above_file_label = tk.Label(file_selection_frame, text="", bg='gray20')
+    padding_above_file_label.grid(row=center-2, column=center, pady=20)
+
+    config_file_label = tk.Label(file_selection_frame, text="Config File Path:", fg='white', bg='gray20')
+    config_file_label.grid(row=center-1, column=center)
+
+    config_file_entry = tk.Entry(file_selection_frame, width=60, fg='white', bg='gray20')
     config_file_entry.grid(row=center, column=center)
 
-    browse_button = tk.Button(file_selection_frame, text="Browse", command=browse_config_file)
-    browse_button.grid(row=center, column=center+1)
+    browse_button = tk.Button(file_selection_frame, text="Browse", command=browse_config_file, fg='white', bg='gray20')
+    browse_button.grid(row=center, column=center+1, padx=5)
 
 if __name__ == '__main__':
 
@@ -195,7 +207,8 @@ if __name__ == '__main__':
 
     # Create the main window
     root = tk.Tk()
-    root.title("Script GUI")
+    root.title("Data Annotation")
+    root.configure(bg='gray20')
 
     # Determine the screen width and height for dynamic sizing
     screen_width = root.winfo_screenwidth()
@@ -211,8 +224,10 @@ if __name__ == '__main__':
 
     # Create frames to organize widgets
     menu_frame = tk.Frame(root)
+    menu_frame.configure(bg='gray20')
     menu_frame.pack()
     file_selection_frame = tk.Frame(root)
+    file_selection_frame.configure(bg='gray20')
     file_selection_frame.pack()
 
     render_file_selection()
@@ -227,16 +242,16 @@ if __name__ == '__main__':
     if os.path.exists(config_file_path):
         config_file_entry.insert(0, config_file_path)
         if validate_config_file(config_file_path):
-            config_valid_label = tk.Label(file_selection_frame, text="File is valid", fg="green")
+            config_valid_label = tk.Label(file_selection_frame, text="File is valid", fg="green", bg='gray20')
             config_valid_label.grid(row=center+1, column=center)
             render_menu(config_file_path)
 
         else:
-            config_valid_label = tk.Label(file_selection_frame, text="File is invalid", fg="red")
+            config_valid_label = tk.Label(file_selection_frame, text="File is invalid", fg="red", bg='gray20')
             config_valid_label.grid(row=center+1, column=center)
 
     else:
-        config_valid_label = tk.Label(file_selection_frame, text="Please select config.yml")
+        config_valid_label = tk.Label(file_selection_frame, text="Please select config.yml", fg='white', bg='gray20')
         config_valid_label.grid(row=center+1, column=center)
 
     root.mainloop()
