@@ -15,8 +15,27 @@ def validate_config_file(file_path):
                 for key, zone in config_data.items():
                     if key.startswith("ZONE_") and "MAC_ADDRESS" in zone:
                         return True
+    except yaml.YAMLError as e:
+        pass
     except Exception as e:
         pass
+    return False
+
+def validate_rgb_config_file(file_path):
+    try:
+        with open(file_path, 'r') as yaml_file:
+            config_data = yaml.safe_load(yaml_file)
+            if isinstance(config_data, dict):
+                for key, zone in config_data.items():
+                    if key.startswith("ZONE_"):
+                        for item in zone:
+                            if item.startswith("CAMERA_"):
+                                return True
+    except yaml.YAMLError as e:
+        pass
+    except Exception as e:
+        pass
+    
     return False
 
 def get_type_choices(file_path):
@@ -38,16 +57,47 @@ def get_include_exclude_choices(file_path):
         pass
     return []
 
-def run_script():
+def get_camera_choices(file_path):
+    try:
+        with open(file_path, 'r') as yaml_file:
+            config_data = yaml.safe_load(yaml_file)
+            device_names = [
+                camera_info["DEVICE_NAME"] for zone_info in config_data.values() if isinstance(zone_info, dict) for camera_info in zone_info.values() 
+                if isinstance(camera_info, dict) and "DEVICE_NAME" in camera_info if camera_info["DEVICE_NAME"]]
+            return device_names
+    except Exception as e:
+        pass
+    return []
+
+def get_video_device_by_device_name(file_path, device_name):
+    try:
+        # Load the YAML configuration from the specified file
+        with open(file_path, "r") as yaml_file:
+            config_data = yaml.safe_load(yaml_file)
+        
+        # Iterate through the config data to find the matching DEVICE_NAME
+        for zone_info in config_data.values():
+            if isinstance(zone_info, dict):
+                for camera_info in zone_info.values():
+                    if isinstance(camera_info, dict) and "DEVICE_NAME" in camera_info:
+                        if camera_info["DEVICE_NAME"] == device_name:
+                            return camera_info.get("VIDEO_DEVICE")
+    
+    except Exception as e:
+        print(f"Error: {str(e)}")
+    
+    # If no match is found or an error occurs, return None
+    return None
+
+def record_sensor_data():
     # Get the path to the config.yml file
     config_file = config_file_entry.get()
 
     # Get the directory where the main.py script is located
     script_directory = os.path.dirname(os.path.abspath(__file__))
     
-    # Set the path to record_pixel_data.py and record_video_data.py
+    # Set the path to record_pixel_data.py
     script_path = os.path.join(script_directory, "data_recording\\record_pixel_data.py")
-    script_path_video = os.path.join(script_directory, "camera\\record_video_data.py")
     
     if not os.path.exists(script_path):
         messagebox.showerror("Error", "record_pixel_data.py not found in the same directory.")
@@ -66,7 +116,6 @@ def run_script():
         type_choices = ' '.join([type_var.get(index) for index in type_var.curselection()]).lower()
         command = fr"python {script_path} --cfg {config_file}"
         
-
         if include_choices:
             command = command + f" --include {include_choices}"
         if exclude_choices:
@@ -74,19 +123,50 @@ def run_script():
         if type_choices:
             command = command + f" --type {type_choices}"
 
+        command = command.replace("\\", "/")
+        command_list = shlex.split(command)
+        subprocess.Popen(command_list)
+
+    except Exception as e:
+        messagebox.showerror("Error", f"Error executing script: {str(e)}")
+
+def record_video_data():
+    # TODO: Check paths they dont consider the entry?
+
+    # Get the path to the rgb_config.yml file
+    rgb_config_file = rgb_config_file_entry.get()
+
+    # Get the directory where the main.py script is located
+    script_directory = os.path.dirname(os.path.abspath(__file__))
+
+    # Set the path to record_video_data.py
+    script_path_video = os.path.join(script_directory, "camera\\record_video_data.py")
+
+    if not os.path.exists(script_path_video):
+        messagebox.showerror("Error", "record_video_data.py not found in the same directory.")
+        return
+    
+    if validate_rgb_config_file(rgb_config_file):
+        rgb_config_valid_label.config(text="File is valid", fg="green")
+    else:
+        rgb_config_valid_label.config(text="File is invalid", fg="red")
+        return
+
+    # Run Python script as a subprocess
+    try:
+
+        camera_choices = [camera_var.get(index) for index in camera_var.curselection()]
         pub_hb = str(pub_hb_var.get())
         pub_data = str(pub_data_var.get())
         
-        # pub_data = 
-        command2 = fr"python {script_path_video} --pub_hb {pub_hb} --pub_data {pub_data}"
+        for camera in camera_choices:
 
-        command = command.replace("\\", "/")
-        command2 = command2.replace("\\", "/")
-        command_list = shlex.split(command)
-        command_list2 = shlex.split(command2)
+            video_capture_index = get_video_device_by_device_name(file_path=rgb_config_file, device_name=camera)
+            command = fr"python {script_path_video} --pub_hb {pub_hb} --pub_data {pub_data} --vid_cap {video_capture_index}"
+            command = command.replace("\\", "/")
+            command_list = shlex.split(command)
 
-        subprocess.Popen(command_list)
-        subprocess.Popen(command_list2)
+            subprocess.Popen(command_list)
 
     except Exception as e:
         messagebox.showerror("Error", f"Error executing script: {str(e)}")
@@ -100,110 +180,164 @@ def browse_config_file():
         config_file_entry.insert(0, file_path)
         if validate_config_file(file_path):
             config_valid_label.config(text="File is valid", fg="green")
-            render_menu(file_path)
+            render_sensor_menu(file_path)
         else:
+            sensor_menu_frame.destroy()
             config_valid_label.config(text="File is invalid", fg="red")
-            render_file_selection()
 
-def render_menu(config_file_path):
+def browse_rgb_config_file():
+    
+    # Open a file dialog to select the rgb_config.yml file
+    file_path = filedialog.askopenfilename(filetypes=[("Config Files", "*.yml")])
+    
+    if file_path:
+        rgb_config_file_entry.delete(0, tk.END)  # Clear any existing text
+        rgb_config_file_entry.insert(0, file_path)
+
+        if validate_rgb_config_file(file_path):
+            rgb_config_valid_label.config(text="File is valid", fg="green")
+            render_video_menu(file_path)
+        else:
+            rgb_config_valid_label.config(text="File is invalid", fg="red")
+            video_menu_frame.destroy()
+
+def render_sensor_menu(config_file_path):
         
     global include_var
     global exclude_var
     global type_var
-    global center
-    global menu_frame
-    global pub_hb_var
-    global pub_data_var
+    global sensor_menu_frame
 
-    menu_frame = tk.Frame(root)
-    menu_frame.configure(bg='gray20')
-    menu_frame.pack()
+    sensor_menu_frame.destroy()
 
-    separator_frame = tk.Frame(menu_frame, height=2, bg="white")
-    separator_frame.grid(row=center+7, column=0, columnspan=10, sticky="ew", pady=30)
+    sensor_menu_frame = tk.Frame(container_frame, width=window_width//2, height=window_height//2, bg='red')
+    sensor_menu_frame.pack(side="left", fill='both', expand=True)
 
-    # Create the include dropdown menu based on config.yml
+    # Create subframes, enumerate from left to right
+    subframe0 = tk.Frame(sensor_menu_frame, bg="gray20")
+    subframe0.pack(side="left", fill="both", expand=True)
+
+    subframe1 = tk.Frame(sensor_menu_frame, bg="gray20")
+    subframe1.pack(side="left", fill="both", expand=True)
+
+    subframe2 = tk.Frame(sensor_menu_frame, bg="gray20")
+    subframe2.pack(side="left", fill="both", expand=True)
+
     include_choices = get_include_exclude_choices(config_file_path)
     exclude_choices = include_choices
     type_choices = get_type_choices(config_file_path)
 
     max_choices = max((len(include_choices), len(type_choices)))
 
-    include_label = tk.Label(menu_frame, text="Include:", fg='white', bg='gray20')
-    include_label.grid(row=center+4, column=center-1)
-    include_var = tk.Listbox(menu_frame, selectmode=tk.MULTIPLE, height=max_choices, exportselection=0, fg='white', bg='gray20', highlightbackground='gray40', borderwidth=5)
+    include_label = tk.Label(subframe0, text="Include:", fg='white', bg='gray20')
+    include_label.pack(pady=10)
+    include_var = tk.Listbox(subframe0, selectmode=tk.MULTIPLE, height=max_choices, exportselection=0, fg='white', bg='gray20', highlightbackground='gray40', borderwidth=5)
     for choice in include_choices:
         include_var.insert(tk.END, choice)
-    include_var.grid(row=center+5, column=center-1, padx=20)
+    include_var.pack()
 
-    exclude_label = tk.Label(menu_frame, text="Exclude:", fg='white', bg='gray20')
-    exclude_label.grid(row=center+4, column=center)
-    exclude_var = tk.Listbox(menu_frame, selectmode=tk.MULTIPLE, height=max_choices, exportselection=0, fg='white', bg='gray20', highlightbackground='gray40',  borderwidth=5)
+    exclude_label = tk.Label(subframe1, text="Exclude:", fg='white', bg='gray20')
+    exclude_label.pack(pady=10)
+    exclude_var = tk.Listbox(subframe1, selectmode=tk.MULTIPLE, height=max_choices, exportselection=0, fg='white', bg='gray20', highlightbackground='gray40',  borderwidth=5)
     for choice in exclude_choices:
         exclude_var.insert(tk.END, choice)
-    exclude_var.grid(row=center+5, column=center, padx=20)
+    exclude_var.pack()
 
-    type_label = tk.Label(menu_frame, text="Types:", fg='white', bg='gray20')
-    type_label.grid(row=center+4, column=center+1)
-    type_var = tk.Listbox(menu_frame, selectmode=tk.MULTIPLE, height=max_choices, exportselection=0, fg='white', bg='gray20', highlightbackground='gray40', borderwidth=5)
+    type_label = tk.Label(subframe2, text="Types:", fg='white', bg='gray20')
+    type_label.pack(pady=10)
+    type_var = tk.Listbox(subframe2, selectmode=tk.MULTIPLE, height=max_choices, exportselection=0, fg='white', bg='gray20', highlightbackground='gray40', borderwidth=5)
     for choice in type_choices:
         type_var.insert(tk.END, choice)
-    type_var.grid(row=center+5, column=center+1, padx=20)
+    type_var.pack()
+
+    # Button to run sensor recording
+    run_sensor_button = tk.Button(subframe1, text="record sensor data", command=record_sensor_data, fg='white', bg='gray20')
+    run_sensor_button.pack(pady=20)
+
+def render_video_menu(video_cfg_path):
+    
+    global video_menu_frame
+    global pub_hb_var
+    global pub_data_var
+    global camera_var
+
+    video_menu_frame.destroy()
+
+    video_menu_frame = tk.Frame(container_frame, width=window_width//2, height=window_height//2, bg='gray20')
+    video_menu_frame.pack(side="right", fill='both', expand=True)
+
+    # Create subframes, enumerate from left to right
+    subframe0 = tk.Frame(video_menu_frame, bg="gray20")
+    subframe0.pack(side="left", fill="both", expand=True)
+
+    subframe1 = tk.Frame(video_menu_frame, bg="gray20")
+    subframe1.pack(side="left", fill="both", expand=True, padx=14)
+
+    subframe2 = tk.Frame(video_menu_frame, bg="gray20")
+    subframe2.pack(side="left", fill="both", expand=True, padx=63)
+
+    camera_choices = get_camera_choices(video_cfg_path)
+    camera_label = tk.Label(subframe0, text="Cameras:", fg='white', bg='gray20')
+    camera_label.pack(pady=10)
+    camera_var = tk.Listbox(subframe0, selectmode=tk.MULTIPLE, height=len(camera_choices), exportselection=0, fg='white', bg='gray20', highlightbackground='gray40', borderwidth=5)
+    for choice in camera_choices:
+        camera_var.insert(tk.END, choice)
+    camera_var.pack()
 
     # Create options for video recording
-    pub_hb_label = tk.Label(menu_frame, text="Publish heartbeat?", fg='white', bg='gray20')
-    pub_hb_label.grid(row=center+8, column=center+1)
+    pub_hb_label = tk.Label(subframe1, text="Publish heartbeat?", fg='white', bg='gray20')
+    pub_hb_label.pack(pady=10)
     pub_hb_var = tk.BooleanVar()
     pub_hb_var.set(True)
-    pub_hb_checkbutton = tk.Checkbutton(menu_frame, text="Yes", variable=pub_hb_var, selectcolor='gray20', fg='white', bg='gray20', activebackground="gray20", activeforeground="white")
-    pub_hb_checkbutton.grid(row=center+9, column=center+1)
+    pub_hb_checkbutton = tk.Checkbutton(subframe1, text="Yes", variable=pub_hb_var, selectcolor='gray20', fg='white', bg='gray20', activebackground="gray20", activeforeground="white")
+    pub_hb_checkbutton.pack()
 
-
-    pub_data_label = tk.Label(menu_frame, text="Publish video data?", fg='white', bg='gray20')
-    pub_data_label.grid(row=center+8, column=center-1)
+    pub_data_label = tk.Label(subframe1, text="Publish video data?", fg='white', bg='gray20')
+    pub_data_label.pack(pady=10)
     pub_data_var = tk.BooleanVar()
-    pub_data_checkbutton = tk.Checkbutton(menu_frame, text="Yes", variable=pub_data_var, selectcolor='gray20', fg='white', bg='gray20', activebackground="gray20", activeforeground="white")
-    pub_data_checkbutton.grid(row=center+9, column=center-1)
+    pub_data_checkbutton = tk.Checkbutton(subframe1, text="Yes", variable=pub_data_var, selectcolor='gray20', fg='white', bg='gray20', activebackground="gray20", activeforeground="white")
+    pub_data_checkbutton.pack()
 
-    # Button to run scripts
-    run_button = tk.Button(menu_frame, text="Start annotation", command=run_script, fg='white', bg='gray20')
-    run_button.grid(row=center+10, column=center)
+    # Button to run video recording
+    run_sensor_button = tk.Button(subframe1, text="record video data", command=record_video_data, fg='white', bg='gray20')
+    run_sensor_button.pack(pady=15)
 
 def render_file_selection():
 
     global config_file_entry
-    global center
-    global menu_frame
+    global rgb_config_file_entry
+    global file_selection_frame
+    global sensor_selection_frame
+    global video_selection_frame
 
-    menu_frame.destroy()
+    config_file_label = tk.Label(sensor_selection_frame, text="Config File Path:", fg='white', bg='gray20')
+    config_file_label.pack(pady=5)
 
-    padding_next_to_valid_label = tk.Label(file_selection_frame, text="", bg='gray20')
-    padding_next_to_valid_label.grid(row=center-1, column=center-1, padx=27)
+    rgb_config_file_label = tk.Label(video_selection_frame, text="RGB Config File Path:", fg='white', bg='gray20')
+    rgb_config_file_label.pack(pady=5)
 
-    padding_below_valid_label = tk.Label(file_selection_frame, text="", bg='gray20')
-    padding_below_valid_label.grid(row=center+2, column=center, pady=10)
+    config_file_entry = tk.Entry(sensor_selection_frame, width=60, fg='white', bg='gray20')
+    config_file_entry.pack()
 
-    padding_above_file_label = tk.Label(file_selection_frame, text="", bg='gray20')
-    padding_above_file_label.grid(row=center-2, column=center, pady=20)
+    rgb_config_file_entry = tk.Entry(video_selection_frame, width=60, fg='white', bg='gray20')
+    rgb_config_file_entry.pack()
 
-    config_file_label = tk.Label(file_selection_frame, text="Config File Path:", fg='white', bg='gray20')
-    config_file_label.grid(row=center-1, column=center)
+    browse_button = tk.Button(sensor_selection_frame, text="Browse", command=browse_config_file, fg='white', bg='gray20')
+    browse_button.pack(pady=5)
 
-    config_file_entry = tk.Entry(file_selection_frame, width=60, fg='white', bg='gray20')
-    config_file_entry.grid(row=center, column=center)
-
-    browse_button = tk.Button(file_selection_frame, text="Browse", command=browse_config_file, fg='white', bg='gray20')
-    browse_button.grid(row=center, column=center+1, padx=5)
+    rgb_browse_button = tk.Button(video_selection_frame, text="Browse", command=browse_rgb_config_file, fg='white', bg='gray20')
+    rgb_browse_button.pack(pady=5)
 
 if __name__ == '__main__':
 
-    center = 5
     include_var = None
     exclude_var = None
     type_var = None
+    camera_var = None
     pub_hb_var = None
     pub_data_var = None
     config_file_entry = None
+    rgb_config_file_entry = None
 
     # Create the main window
     root = tk.Tk()
@@ -223,35 +357,64 @@ if __name__ == '__main__':
     root.geometry(f"{window_width}x{window_height}+{window_position_x}+{window_position_y}")
 
     # Create frames to organize widgets
-    menu_frame = tk.Frame(root)
-    menu_frame.configure(bg='gray20')
-    menu_frame.pack()
-    file_selection_frame = tk.Frame(root)
-    file_selection_frame.configure(bg='gray20')
-    file_selection_frame.pack()
+    file_selection_frame = tk.Frame(root, width=window_width, height=window_height//4, bg='gray20')
+    file_selection_frame.pack(side="top", fill="x")
 
+    sensor_selection_frame = tk.Frame(file_selection_frame, bg='gray20')
+    sensor_selection_frame.pack(side="left", fill="both", expand=True)
+
+    video_selection_frame = tk.Frame(file_selection_frame, bg='gray20')
+    video_selection_frame.pack(side="left", fill="both", expand=True)
+
+    container_frame = tk.Frame(root)
+    container_frame.pack(side="top", fill="both", expand=True)
+
+    sensor_menu_frame = tk.Frame(container_frame, width=window_width//2, height=window_height//2, bg='gray20')
+    sensor_menu_frame.pack(side="left", fill='both', expand=True)
+
+    video_menu_frame = tk.Frame(container_frame, width=window_width//2, height=window_height//2, bg='gray20')
+    video_menu_frame.pack(side="right", fill='both', expand=True)
+    
     render_file_selection()
 
     # Get the directory where the config.yaml script is located
     main_dir = os.path.dirname(os.path.abspath(__file__))
     data_recording_dir = os.path.join(main_dir, "data_recording")
-    
     # Check if a config.yml file exists in the same directory
     config_file_path = os.path.join(data_recording_dir, "config.yml")
+    # Get the directory where the rgb_config.yaml script is located
+    camera_dir = os.path.join(main_dir, "camera")
+    # Check if a rgb_config.yml file exists in the same directory
+    rgb_cfg_path = os.path.join(camera_dir, "rgb_config.yml")
         
     if os.path.exists(config_file_path):
         config_file_entry.insert(0, config_file_path)
         if validate_config_file(config_file_path):
-            config_valid_label = tk.Label(file_selection_frame, text="File is valid", fg="green", bg='gray20')
-            config_valid_label.grid(row=center+1, column=center)
-            render_menu(config_file_path)
+            config_valid_label = tk.Label(sensor_selection_frame, text="File is valid", fg="green", bg='gray20')
+            config_valid_label.pack(pady=5)
+            render_sensor_menu(config_file_path)
 
         else:
-            config_valid_label = tk.Label(file_selection_frame, text="File is invalid", fg="red", bg='gray20')
-            config_valid_label.grid(row=center+1, column=center)
+            config_valid_label = tk.Label(sensor_selection_frame, text="File is invalid", fg="red", bg='gray20')
+            config_valid_label.pack(pady=5)
 
     else:
-        config_valid_label = tk.Label(file_selection_frame, text="Please select config.yml", fg='white', bg='gray20')
-        config_valid_label.grid(row=center+1, column=center)
+        config_valid_label = tk.Label(sensor_selection_frame, text="Please select config.yml", fg='white', bg='gray20')
+        config_valid_label.pack(pady=5)
+
+    if os.path.exists(rgb_cfg_path):
+        rgb_config_file_entry.insert(0, rgb_cfg_path)
+        if validate_rgb_config_file(rgb_cfg_path):
+            rgb_config_valid_label = tk.Label(video_selection_frame, text="File is valid", fg="green", bg='gray20')
+            rgb_config_valid_label.pack(pady=5)
+            render_video_menu(rgb_cfg_path)
+
+        else:
+            rgb_config_valid_label = tk.Label(video_selection_frame, text="File is invalid", fg="red", bg='gray20')
+            rgb_config_valid_label.pack(pady=5)
+
+    else:
+        rgb_config_valid_label = tk.Label(video_selection_frame, text="Please select rgb_config.yml", fg='white', bg='gray20')
+        rgb_config_valid_label.pack(pady=5)
 
     root.mainloop()
