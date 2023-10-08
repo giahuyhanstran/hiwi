@@ -34,10 +34,11 @@ def _get_config(filename: str ='rgb_config.yml') -> dict:
 def main():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--length', type=int, help='default until interrupt, else time in seconds', default= None)
+    parser.add_argument('--length', type=int, help='default until interrupt, else time in seconds', default=None)
     parser.add_argument('--hb_interval', type=int, help='heartbeat interval in seconds, default = 1', default=1)
     parser.add_argument('--pub_hb', type=ast.literal_eval, help='publish heartbeat? True or False, default = True', default=True)
     parser.add_argument('--pub_data', type=ast.literal_eval, help='publish data? True or False, else save locally, default = True', default=True)
+    parser.add_argument('--vid_cap', type=int, help='Decide which Video Capture channel open-cv should use, default = 0', default=0)
     args = parser.parse_args()
 
     rgb_cfg = _get_config()

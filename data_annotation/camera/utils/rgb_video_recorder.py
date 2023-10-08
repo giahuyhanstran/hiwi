@@ -7,25 +7,21 @@ import struct
 import uuid
 from utils.video_processor import Video_Processor
 
-# TODO (if not arg.pub_data) -> save data locally, avoid data chunks and all that
-
-
 class RGB_Video_Recorder:
     
     def __init__(self, args, cfg):
         self.__cfg = cfg
         self.__args = args
-        self.__device_name: str = self.__cfg['CAMERA']['DEVICE_NAME']
+        self.__device_name: str = "Change device name"
         self.__client = None
         self.__hb_interval: int = args.hb_interval
-        self.__video_device: int = self.__cfg['CAMERA']['VIDEO_DEVICE']
-        self.__uuid = uuid.UUID(self.__cfg['CAMERA']['UUID']).bytes
+        self.__video_device: int = self.__args.vid_cap
+        self.__uuid = uuid.UUID('fe02d46b-ed11-4304-9241-cb0f7d2dbceb').bytes
         self.__length = self.__args.length
 
         if self.__args.pub_hb or args.pub_data:
             self.__client = mqtt.Client('RGB_Test_Camera' + '_' + str(randint(1, 1000000)))
             self.__client.connect(host=self.__cfg['MQTT']['ADDRESS-L'], port=self.__cfg['MQTT']['PORT'])
-
 
     def record_video_audio(self):
         cap = cv2.VideoCapture(self.__video_device)
