@@ -2,6 +2,7 @@ import yaml
 import paho.mqtt.client as mqtt
 from utils.decoder import PayloadDecoder
 from random import randint
+import threading
 from threading import Thread
 from numpy import sqrt
 import time
@@ -20,8 +21,12 @@ class MQTTSubscriber:
     """A class to connect to the MQTT broker."""
 
     def __init__(self, config: dict, args, path: str = 'matrix_data/'):
+        self.__stop_flag = False
+        self.__stop_lock = threading.Lock()
+        self.__datetime = None
         self.__cfg: dict = config
         self.__args = args
+        self.__save_loc = self.__args.save_loc + '/'
         self.__zones: list = [item for item in config if 'ZONE' in item]
         self.__subtopics: list = self.__cfg['SUBTOPIC']
         self.__topic: list[tuple[str, int]] = [(f"chip/{self.__cfg[zone]['MAC_ADDRESS']}/{subtopic}", 0) 
@@ -156,10 +161,13 @@ class MQTTSubscriber:
         Args:
             rc_time: The time for which you want to record data.
         """
+        self.__datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
         if rc_time is None:
             t = Thread(target=self.__client.loop_forever)
             t.start()
-            keyboard.wait('s')
+            while not self.__stop_flag:
+                pass
             self.__client.disconnect()
             self.__client.loop_stop()
         else:
@@ -167,7 +175,7 @@ class MQTTSubscriber:
                 start_time = time.time()
                 self.__client.loop_start()
                 while True:
-                    if time.time() - start_time >= rc_time or keyboard.is_pressed('s'):
+                    if time.time() - start_time >= rc_time or self.__stop_flag:
                         self.__client.disconnect()
                         self.__client.loop_stop()
                         break
@@ -178,6 +186,10 @@ class MQTTSubscriber:
         self.__json_to_csv()
         self.__del_json()
    
+    def stop_receiving(self):
+        with self.__stop_lock:
+            self.__stop_flag = True
+
     def __update_heartbeats(self, current_datetime: str, interval: int):
 
         current_datetime = datetime.strptime(current_datetime, "%Y-%m-%d_%H-%M-%S-%f")
@@ -189,10 +201,12 @@ class MQTTSubscriber:
 
     def __json_to_csv(self):
 
-        current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        csv_path = f"sensor_data_{current_datetime}"
-        if not exists(csv_path):
-            makedirs(csv_path)
+        csv_path = f"{self.__datetime}_sensor_data"
+
+        save_loc = self.__save_loc + csv_path
+
+        if not exists(save_loc):
+            makedirs(save_loc)
 
         print('Adding received heartbeats to data ...')
         data_folder: list[str] = [folder for folder in listdir(f'{self.__path}') if not isfile(join(self.__path, folder))]
@@ -228,7 +242,7 @@ class MQTTSubscriber:
                     data.append(payload['HEARTBEATS'][key][0])                                                        
                 df.loc[len(df)] = data
             
-            df.to_csv(f"{csv_path}/{folder}.csv", index=False)
+            df.to_csv(f"{save_loc}/{folder}.csv", index=False)
 
     def __get_sensor_unit_name(self, sensor_mac: str) -> str:
         """Extracts the sensor unit name corresponding to it's mac address.

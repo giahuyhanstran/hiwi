@@ -126,6 +126,7 @@ def record_sensor_data():
         type_choices = ' '.join([type_var.get(index) for index in type_var.curselection()]).lower()
         ip_address = ip_entry.get()
         port = port_entry.get()
+        save_location = save_location_label.cget('text')
 
         command = fr"python {script_path} --cfg {config_file}"
         
@@ -139,6 +140,8 @@ def record_sensor_data():
             command = command + f" --ip {ip_address}"
         if port:
             command = command + f" --port {port}"
+        if save_location:
+            command = command + f" --save_loc {save_location}"   
 
         command = command.replace("\\", "/")
         command_list = shlex.split(command)
@@ -148,7 +151,6 @@ def record_sensor_data():
         messagebox.showerror("Error", f"Error executing script: {str(e)}")
 
 def record_video_data():
-    # TODO: Check paths they dont consider the entry?
 
     # Get the path to the rgb_config.yml file
     rgb_config_file = rgb_config_file_entry.get()
@@ -177,11 +179,12 @@ def record_video_data():
         pub_data = str(pub_data_var.get())
         ip_address = ip_entry.get()
         port = port_entry.get()
+        save_location = save_location_label.cget('text')
         
         for camera in camera_choices:
 
             video_capture_index = get_video_device_by_device_name(file_path=rgb_config_file, device_name=camera)
-            command = fr"python {script_path_video} --pub_hb {pub_hb} --pub_data {pub_data} --vid_cap {video_capture_index} --ip {ip_address} --port {port}"
+            command = fr"python {script_path_video} --pub_hb {pub_hb} --pub_data {pub_data} --vid_cap {video_capture_index} --ip {ip_address} --port {port} --save_loc {save_location}"
             command = command.replace("\\", "/")
             command_list = shlex.split(command)
 
@@ -223,6 +226,12 @@ def browse_rgb_config_file():
             rgb_config_valid_label.config(text="File is invalid", fg="red")
             video_menu_frame.destroy()
             render_ip_view()
+
+def browse_save_location(save_location_label):
+
+    folder_path = filedialog.askdirectory()
+    if folder_path:
+        save_location_label.config(text=folder_path)
 
 def render_sensor_menu(config_file_path):
         
@@ -357,6 +366,7 @@ def render_ip_view():
     global ip_frame
     global ip_entry
     global port_entry
+    global save_location_label
 
     ip_container_frame.destroy()
 
@@ -372,7 +382,7 @@ def render_ip_view():
         ip_entry.pack(side='left')
 
         pad = tk.Label(ip_container_frame, bg='gray20')
-        pad.pack(side='left', padx=10, pady=10)
+        pad.pack(side='left', padx=10, pady=30)
 
         port_label = tk.Label(ip_container_frame, text='port:', fg='white', bg='gray20')
         port_label.pack(side='left', padx=5)
@@ -381,13 +391,22 @@ def render_ip_view():
         port_entry.pack(side='left')
 
         pad2 = tk.Label(ip_container_frame, bg='gray20')
-        pad2.pack(side='left', padx=13)
+        pad2.pack(side='left', padx=10)
 
         if validate_config_file(config_file_entry.get()):
 
             ip_address, port = get_ip_port(config_file_entry.get())
             ip_entry.insert(0, ip_address)
             port_entry.insert(0, port)
+
+        # Label to display the selected save location
+        save_location_label = tk.Label(ip_container_frame, text="", fg='white', bg='gray20')
+
+        # Create a button to trigger folder selection
+        select_button = tk.Button(ip_container_frame, text="Select Save Location", command=lambda: browse_save_location(save_location_label), fg='white', bg='gray20')
+        select_button.pack(side='left')
+
+        save_location_label.pack(side='left', padx=5)
 
 if __name__ == '__main__':
 
@@ -401,6 +420,7 @@ if __name__ == '__main__':
     rgb_config_file_entry = None
     ip_entry = None
     port_entry = None
+    save_location_label = None
 
     # Create the main window
     root = tk.Tk()

@@ -15,14 +15,13 @@ import speech_recognition as sr
 
 class Video_Processor:
 
-    def __init__(self, length: int = None):
+    def __init__(self, save_location: str, length: int = None):
         self.__time_done = False
-
         self.__current_datetime = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        self.__DIRECTORY = os.path.join(os.getcwd(), self.__current_datetime)
-        if not os.path.exists(self.__DIRECTORY):
-            os.makedirs(self.__DIRECTORY)
-        os.chdir(self.__DIRECTORY)
+        self.__save_loc = os.path.join(save_location, self.__current_datetime)
+        if not os.path.exists(self.__save_loc):
+            os.makedirs(self.__save_loc)
+        os.chdir(self.__save_loc)
         self.__FRAME_WIDTH = 640
         self.__FRAME_HEIGHT = 480
         self.__FPS = 30
@@ -46,7 +45,6 @@ class Video_Processor:
         self.__address_l = "localhost"
         self.__client = mqtt.Client("Laptop")
         self.__topic = "Camera"
-
 
     def receive_mqtt_messages(self):
 
@@ -96,7 +94,6 @@ class Video_Processor:
 
         command = f'ffmpeg -i "{video_file}" -i "{audio_file}" -c:v copy -c:a aac -strict experimental "{output_file}"'
         subprocess.run(command, shell=True)
-
 
     def __time_check(self, time_in_seconds):
         start_time = time.time()

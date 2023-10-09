@@ -41,6 +41,8 @@ def main():
     parser.add_argument('--vid_cap', type=int, help='Decide which Video Capture channel open-cv should use, default = 0', default=0)
     parser.add_argument('--ip', type=str, help='Pass an ip-address used by the mqtt-Broker to publish heartbeats, default = localhost', default='localhost')
     parser.add_argument('--port', type=int, help='Pass a port used by the mqtt-Broker to publish heartbeats, default = 1883', default=1883)
+    parser.add_argument('--save_loc', type=str, help='Enter a path to a folder that will be used as a save location for the recordings, default = None', default=None)
+
     
     args = parser.parse_args()
 

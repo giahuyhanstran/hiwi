@@ -5,7 +5,6 @@ import argparse
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
-
 def _get_config(filename: str ='config.yml') -> dict:
     ''' Method to load data out of config file
 
@@ -76,11 +75,14 @@ def main():
     parser.add_argument('--type', type=str, choices=type_choices, 
                         help='What kind of data you want to receive, of the selected sensor units.')
     
-    parser.add_argument('--ip', type=str, 
-                        help='Pass an ip-address used by the mqtt-Broker to publish heartbeats, default = localhost', default='localhost')
+    parser.add_argument('--ip', type=str, default='localhost', 
+                        help='Pass an ip-address used by the mqtt-Broker to publish heartbeats, default = localhost')
 
-    parser.add_argument('--port', type=int, 
-                        help='Pass a port used by the mqtt-Broker to publish heartbeats, default = 1883', default=1883)
+    parser.add_argument('--port', type=int, default=1883, 
+                        help='Pass a port used by the mqtt-Broker to publish heartbeats, default = 1883')
+
+    parser.add_argument('--save_loc', type=str, default=None, 
+                        help='Enter a path to a folder that will be used as a save location for the recordings, default = None')
 
     args = parser.parse_args(unknown_args)
 

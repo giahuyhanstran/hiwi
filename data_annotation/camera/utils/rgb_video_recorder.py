@@ -18,6 +18,7 @@ class RGB_Video_Recorder:
         self.__video_device: int = self.__args.vid_cap
         self.__uuid = uuid.UUID('fe02d46b-ed11-4304-9241-cb0f7d2dbceb').bytes
         self.__length = self.__args.length
+        self.__save_loc = self.__args.save_loc + '/'
 
         if self.__args.pub_hb or args.pub_data:
             self.__client = mqtt.Client('RGB_Test_Camera' + '_' + str(randint(1, 1000000)))
@@ -31,7 +32,7 @@ class RGB_Video_Recorder:
             Done = False
 
         if not self.__args.pub_data:
-            vp = Video_Processor()
+            vp = Video_Processor(save_location = self.__save_loc)
 
         # default settings
         FPS = int(cap.get(cv2.CAP_PROP_FPS))
