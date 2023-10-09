@@ -75,6 +75,12 @@ def main():
     
     parser.add_argument('--type', type=str, choices=type_choices, 
                         help='What kind of data you want to receive, of the selected sensor units.')
+    
+    parser.add_argument('--ip', type=str, 
+                        help='Pass an ip-address used by the mqtt-Broker to publish heartbeats, default = localhost', default='localhost')
+
+    parser.add_argument('--port', type=int, 
+                        help='Pass a port used by the mqtt-Broker to publish heartbeats, default = 1883', default=1883)
 
     args = parser.parse_args(unknown_args)
 

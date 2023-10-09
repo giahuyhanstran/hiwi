@@ -21,7 +21,7 @@ class RGB_Video_Recorder:
 
         if self.__args.pub_hb or args.pub_data:
             self.__client = mqtt.Client('RGB_Test_Camera' + '_' + str(randint(1, 1000000)))
-            self.__client.connect(host=self.__cfg['MQTT']['ADDRESS-L'], port=self.__cfg['MQTT']['PORT'])
+            self.__client.connect(host=self.__args.ip, port=self.__args.port)
 
     def record_video_audio(self):
         cap = cv2.VideoCapture(self.__video_device)

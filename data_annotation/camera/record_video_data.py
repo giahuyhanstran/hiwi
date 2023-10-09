@@ -39,6 +39,9 @@ def main():
     parser.add_argument('--pub_hb', type=ast.literal_eval, help='publish heartbeat? True or False, default = True', default=True)
     parser.add_argument('--pub_data', type=ast.literal_eval, help='publish data? True or False, else save locally, default = True', default=True)
     parser.add_argument('--vid_cap', type=int, help='Decide which Video Capture channel open-cv should use, default = 0', default=0)
+    parser.add_argument('--ip', type=str, help='Pass an ip-address used by the mqtt-Broker to publish heartbeats, default = localhost', default='localhost')
+    parser.add_argument('--port', type=int, help='Pass a port used by the mqtt-Broker to publish heartbeats, default = 1883', default=1883)
+    
     args = parser.parse_args()
 
     rgb_cfg = _get_config()
