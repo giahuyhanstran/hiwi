@@ -89,6 +89,16 @@ def get_video_device_by_device_name(file_path, device_name):
     # If no match is found or an error occurs, return None
     return None
 
+def get_ip_port(file_path: str) -> tuple[str | None, str | None]:
+    try:
+        with open(file_path, "r") as yaml_file:
+            config_data = yaml.safe_load(yaml_file)
+        return (config_data['MQTT']['ADDRESS'], config_data['MQTT']['PORT'])
+    except Exception as e:
+        print(f"Error: {str(e)}")
+
+    return None
+
 def record_sensor_data():
     # Get the path to the config.yml file
     config_file = config_file_entry.get()
@@ -114,6 +124,9 @@ def record_sensor_data():
         include_choices = ' '.join([include_var.get(index) for index in include_var.curselection()])
         exclude_choices = ' '.join([exclude_var.get(index) for index in exclude_var.curselection()])
         type_choices = ' '.join([type_var.get(index) for index in type_var.curselection()]).lower()
+        ip_address = ip_entry.get()
+        port = port_entry.get()
+
         command = fr"python {script_path} --cfg {config_file}"
         
         if include_choices:
@@ -122,6 +135,10 @@ def record_sensor_data():
             command = command + f" --exclude {exclude_choices}"
         if type_choices:
             command = command + f" --type {type_choices}"
+        if ip_address:
+            command = command + f" --ip {ip_address}"
+        if port:
+            command = command + f" --port {port}"
 
         command = command.replace("\\", "/")
         command_list = shlex.split(command)
@@ -158,11 +175,13 @@ def record_video_data():
         camera_choices = [camera_var.get(index) for index in camera_var.curselection()]
         pub_hb = str(pub_hb_var.get())
         pub_data = str(pub_data_var.get())
+        ip_address = ip_entry.get()
+        port = port_entry.get()
         
         for camera in camera_choices:
 
             video_capture_index = get_video_device_by_device_name(file_path=rgb_config_file, device_name=camera)
-            command = fr"python {script_path_video} --pub_hb {pub_hb} --pub_data {pub_data} --vid_cap {video_capture_index}"
+            command = fr"python {script_path_video} --pub_hb {pub_hb} --pub_data {pub_data} --vid_cap {video_capture_index} --ip {ip_address} --port {port}"
             command = command.replace("\\", "/")
             command_list = shlex.split(command)
 
@@ -181,9 +200,11 @@ def browse_config_file():
         if validate_config_file(file_path):
             config_valid_label.config(text="File is valid", fg="green")
             render_sensor_menu(file_path)
+            render_ip_view()
         else:
             sensor_menu_frame.destroy()
             config_valid_label.config(text="File is invalid", fg="red")
+            render_ip_view()
 
 def browse_rgb_config_file():
     
@@ -197,9 +218,11 @@ def browse_rgb_config_file():
         if validate_rgb_config_file(file_path):
             rgb_config_valid_label.config(text="File is valid", fg="green")
             render_video_menu(file_path)
+            render_ip_view()
         else:
             rgb_config_valid_label.config(text="File is invalid", fg="red")
             video_menu_frame.destroy()
+            render_ip_view()
 
 def render_sensor_menu(config_file_path):
         
@@ -210,7 +233,7 @@ def render_sensor_menu(config_file_path):
 
     sensor_menu_frame.destroy()
 
-    sensor_menu_frame = tk.Frame(container_frame, width=window_width//2, height=window_height//2, bg='red')
+    sensor_menu_frame = tk.Frame(left_container_frame, width=window_width//2, height=window_height//2, bg='gray20')
     sensor_menu_frame.pack(side="left", fill='both', expand=True)
 
     # Create subframes, enumerate from left to right
@@ -263,7 +286,7 @@ def render_video_menu(video_cfg_path):
 
     video_menu_frame.destroy()
 
-    video_menu_frame = tk.Frame(container_frame, width=window_width//2, height=window_height//2, bg='gray20')
+    video_menu_frame = tk.Frame(right_container_frame, width=window_width//2, height=window_height//2, bg='gray20')
     video_menu_frame.pack(side="right", fill='both', expand=True)
 
     # Create subframes, enumerate from left to right
@@ -328,6 +351,44 @@ def render_file_selection():
     rgb_browse_button = tk.Button(video_selection_frame, text="Browse", command=browse_rgb_config_file, fg='white', bg='gray20')
     rgb_browse_button.pack(pady=5)
 
+def render_ip_view():
+
+    global ip_container_frame
+    global ip_frame
+    global ip_entry
+    global port_entry
+
+    ip_container_frame.destroy()
+
+    ip_container_frame = tk.Frame(ip_frame, width=window_width, height=window_height//8, bg='gray20')
+    ip_container_frame.pack(side="top")
+
+    if validate_config_file(config_file_entry.get()) or validate_rgb_config_file(rgb_config_file_entry):
+
+        ip_label = tk.Label(ip_container_frame, text='ip-address:', fg='white', bg='gray20')
+        ip_label.pack(side='left', padx=5)
+
+        ip_entry = tk.Entry(ip_container_frame, fg='white', bg='gray20')
+        ip_entry.pack(side='left')
+
+        pad = tk.Label(ip_container_frame, bg='gray20')
+        pad.pack(side='left', padx=10, pady=10)
+
+        port_label = tk.Label(ip_container_frame, text='port:', fg='white', bg='gray20')
+        port_label.pack(side='left', padx=5)
+
+        port_entry = tk.Entry(ip_container_frame, fg='white', bg='gray20')
+        port_entry.pack(side='left')
+
+        pad2 = tk.Label(ip_container_frame, bg='gray20')
+        pad2.pack(side='left', padx=13)
+
+        if validate_config_file(config_file_entry.get()):
+
+            ip_address, port = get_ip_port(config_file_entry.get())
+            ip_entry.insert(0, ip_address)
+            port_entry.insert(0, port)
+
 if __name__ == '__main__':
 
     include_var = None
@@ -338,6 +399,8 @@ if __name__ == '__main__':
     pub_data_var = None
     config_file_entry = None
     rgb_config_file_entry = None
+    ip_entry = None
+    port_entry = None
 
     # Create the main window
     root = tk.Tk()
@@ -366,15 +429,27 @@ if __name__ == '__main__':
     video_selection_frame = tk.Frame(file_selection_frame, bg='gray20')
     video_selection_frame.pack(side="left", fill="both", expand=True)
 
-    container_frame = tk.Frame(root)
+    ip_frame = tk.Frame(root, width=window_width, height=window_height//8, bg='gray20')
+    ip_frame.pack(side="top", fill="x")
+
+    ip_container_frame = tk.Frame(ip_frame, width=window_width, height=window_height//8, bg='gray20')
+    ip_container_frame.pack(side="top")
+
+    container_frame = tk.Frame(root, bg='gray20')
     container_frame.pack(side="top", fill="both", expand=True)
 
-    sensor_menu_frame = tk.Frame(container_frame, width=window_width//2, height=window_height//2, bg='gray20')
+    left_container_frame = tk.Frame(container_frame, width=window_width//2, height=window_height//2, bg='gray20')
+    left_container_frame.pack(side="left", fill='both', expand=True)
+
+    right_container_frame = tk.Frame(container_frame, width=window_width//2, height=window_height//2, bg='gray20')
+    right_container_frame.pack(side="left", fill='both', expand=True)
+
+    sensor_menu_frame = tk.Frame(left_container_frame, width=window_width//2, height=window_height//2, bg='gray20')
     sensor_menu_frame.pack(side="left", fill='both', expand=True)
 
-    video_menu_frame = tk.Frame(container_frame, width=window_width//2, height=window_height//2, bg='gray20')
+    video_menu_frame = tk.Frame(right_container_frame, width=window_width//2, height=window_height//2, bg='gray20')
     video_menu_frame.pack(side="right", fill='both', expand=True)
-    
+
     render_file_selection()
 
     # Get the directory where the config.yaml script is located
@@ -393,6 +468,7 @@ if __name__ == '__main__':
             config_valid_label = tk.Label(sensor_selection_frame, text="File is valid", fg="green", bg='gray20')
             config_valid_label.pack(pady=5)
             render_sensor_menu(config_file_path)
+            render_ip_view()
 
         else:
             config_valid_label = tk.Label(sensor_selection_frame, text="File is invalid", fg="red", bg='gray20')
@@ -408,6 +484,7 @@ if __name__ == '__main__':
             rgb_config_valid_label = tk.Label(video_selection_frame, text="File is valid", fg="green", bg='gray20')
             rgb_config_valid_label.pack(pady=5)
             render_video_menu(rgb_cfg_path)
+            render_ip_view()
 
         else:
             rgb_config_valid_label = tk.Label(video_selection_frame, text="File is invalid", fg="red", bg='gray20')
