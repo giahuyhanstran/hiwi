@@ -1,10 +1,9 @@
 #----------- Data source
-READ_FROM: RGB
+READ_FROM: MQTT
 MQTT:
   USERNAME: marcel.walz
   PASSWORD:
   ADDRESS: 192.168.1.80
-  ADDRESS-L: localhost
   PORT: 1883
 
 ZONE_0:
