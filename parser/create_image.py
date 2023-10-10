@@ -54,12 +54,11 @@ def fetch_Data(loaded_data):
     Modids = []
     Date = []
     Data = (Modids, Date)
-    #print(len(loaded_data))
+    # print(len(loaded_data))
     for data in loaded_data:
-
         Modids.append((int(data['MODID'][:2], 16) - 1, int(data['MODID'][2:], 16) - 2))
         Date.append(data['event_millis'])
-    #print(len(Modids),len(Date))
+    # print(len(Modids),len(Date))
 
     return Data
 
@@ -83,6 +82,19 @@ def generate_grid():
     return grid
 
 
+def generate_visualization_grid(grid):
+    ROWS, COLUMNS = grid.shape
+    vis_grid = np.zeros((ROWS, COLUMNS))
+
+    for i in range(ROWS):
+        for j in range(COLUMNS):
+            cell_info = grid[i, j]
+            vis_info = cell_info['Number_of_Activations']
+            vis_grid[i, j] = vis_info
+
+    return vis_grid
+
+
 def apply_info(data, grid):
     cell_info_list = []
 
@@ -91,42 +103,32 @@ def apply_info(data, grid):
 
         cell_info['Number_of_Activations'] += 1
         cell_info['Date'] = data[1][count]
-
         cell_info_list.append(cell_info)
 
-    print(cell_info_list)
+        plot_grid(cell_info_list, generate_visualization_grid(grid))
 
-    return cell_info_list, grid
-
-
-def generate_visualization_grid(grid):
-    #print(grid)
-    ROWS, COLUMNS = grid[1].shape
-    vis_grid = np.zeros((ROWS, COLUMNS))
-
-    for i in range(ROWS):
-        for j in range(COLUMNS):
-            cell_info = grid[1][i, j]
-            vis_info = cell_info['Number_of_Activations']
-            vis_grid[i, j] = vis_info
-
-    #print(vis_grid, grid)
-
-    return vis_grid, grid[0]
+    calc_recent_activation(cell_info_list)
 
 
-def plot_grid(vis_grid):
-    info_grid = vis_grid
+def calc_recent_activation(applied_grid):
+    
+    ...
+
+
+def plot_grid(applied_grid, grid, highlight_condition):
+    info_grid = (applied_grid, grid)
     print(info_grid)
+
     # x and y axis is swapped
     custom_colors = [(255, 245, 235), (254, 230, 206), (253, 208, 162), (253, 174, 107),
                      (253, 141, 60), (241, 105, 19), (217, 72, 1), (166, 54, 3), (127, 39, 4)]
     normalized_colors = [(r / 255, g / 255, b / 255) for r, g, b in custom_colors]
     custom_cmap = ListedColormap(normalized_colors)
     fig, ax = plt.subplots()
-
-    vis_grid = vis_grid[0][::-1]
+    vis_grid = grid[::-1]
     n, m = vis_grid.shape
+
+
     cax = ax.imshow(vis_grid, cmap=custom_cmap, interpolation='none', aspect='auto')
     # plt.imshow(np.ones_like(grid), cmap='binary', interpolation='none', aspect='auto')
     plt.xticks([])  # Hide x-axis ticks
@@ -135,7 +137,16 @@ def plot_grid(vis_grid):
 
     for i in range(n):
         for j in range(m):
-            plt.text(j, i, int(vis_grid[i, j]), ha='center', va='center', color='black', fontsize=8)
+            cell_value = int(vis_grid[i, j])
+            if highlight_condition(i, j):
+                cell_color = 'black'
+                cell_edgecolor = 'purple'  # Set the outline color to purple for every second cell
+            else:
+                cell_color = 'black'
+                cell_edgecolor = 'white'  # Set the outline color to white for other cells
+            plt.text(j, i, cell_value, ha='center', va='center', color=cell_color, fontsize=8)
+            rect = plt.Rectangle((j - 0.5, i - 0.5), 1, 1, fill=False, edgecolor=cell_edgecolor)
+            ax.add_patch(rect)
 
     # Add spacing between squares
     for i in range(1, n):
@@ -143,34 +154,35 @@ def plot_grid(vis_grid):
     for j in range(1, m):
         plt.axvline(j - 0.5, color='black', lw=0.5, linestyle='--')
 
+
     title_key = 'Date'
-    #real_time = datetime.datetime.fromtimestamp(info_grid[1][1][title_key])
-    plt.title(f'{info_grid[1][-1][title_key]}')
-    #plt.text(5, 10, real_time, fontsize=14)
-
-
-    # for coord in modids:
-    #   y, x = coord
-    #  grid[x, y] += 1
+    print(info_grid[0][-1])
+    #print(info_grid[0][title_key])
+    # real_time = datetime.datetime.fromtimestamp(info_grid[1][1][title_key])
+    plt.title(f'{info_grid[0][-1][title_key]}')
+    # plt.text(5, 10, real_time, fontsize=14)
 
     folder_name = 'pictures'
     current_msg = -1
-    file_name = f"{info_grid[1][current_msg]['Date']}.png"  # Change this to your desired file name
+
+    file_name = f"{info_grid[0][-1][title_key]}_lol.png"
     file_path = os.path.join(folder_name, file_name)
 
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
 
     plt.savefig(file_path)
-    plt.show()
 
 
 if __name__ == "__main__":
-    folder_path = 'json_folder'
+    folder_path = 'json'
     loaded_data = fetch_message(folder_path)
-    mods = fetch_Data(loaded_data)
+
+    modifications = fetch_Data(loaded_data)
     grid = generate_grid()
-    applied_grid = apply_info(mods, grid)
-    vis_grid = generate_visualization_grid(applied_grid)
-    #print(vis_grid)
-    plot_grid(vis_grid)
+
+    apply_info(modifications, grid)
+    # calc_recent_activation(applied_grid)
+
+
+
