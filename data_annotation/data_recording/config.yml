@@ -3,7 +3,7 @@ READ_FROM: MQTT
 MQTT:
   USERNAME: marcel.walz
   PASSWORD:
-  ADDRESS: 192.168.1.80
+  ADDRESS: localhost
   PORT: 1883
 
 #---------- Subtopics to publish for each Zone
