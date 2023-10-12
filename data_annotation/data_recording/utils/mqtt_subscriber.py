@@ -2,7 +2,6 @@ import yaml
 import paho.mqtt.client as mqtt
 from utils.decoder import PayloadDecoder
 from random import randint
-import threading
 from threading import Thread
 from numpy import sqrt
 import time
@@ -21,8 +20,6 @@ class MQTTSubscriber:
     """A class to connect to the MQTT broker."""
 
     def __init__(self, config: dict, args, path: str = 'matrix_data/'):
-        self.__stop_flag = False
-        self.__stop_lock = threading.Lock()
         self.__datetime = None
         self.__cfg: dict = config
         self.__args = args
@@ -166,7 +163,7 @@ class MQTTSubscriber:
         if rc_time is None:
             t = Thread(target=self.__client.loop_forever)
             t.start()
-            while not self.__stop_flag:
+            while not keyboard.is_pressed('s'):
                 pass
             self.__client.disconnect()
             self.__client.loop_stop()
@@ -175,7 +172,7 @@ class MQTTSubscriber:
                 start_time = time.time()
                 self.__client.loop_start()
                 while True:
-                    if time.time() - start_time >= rc_time or self.__stop_flag:
+                    if time.time() - start_time >= rc_time or keyboard.is_pressed('s'):
                         self.__client.disconnect()
                         self.__client.loop_stop()
                         break
@@ -185,10 +182,6 @@ class MQTTSubscriber:
 
         self.__json_to_csv()
         self.__del_json()
-   
-    def stop_receiving(self):
-        with self.__stop_lock:
-            self.__stop_flag = True
 
     def __update_heartbeats(self, current_datetime: str, interval: int):
 
