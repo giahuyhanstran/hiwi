@@ -1,4 +1,3 @@
-# TODO concate Video
 import argparse
 import os
 import pickle
@@ -11,7 +10,6 @@ import paho.mqtt.client as mqtt
 import datetime
 import keyboard
 import speech_recognition as sr
-
 
 class Video_Processor:
 
