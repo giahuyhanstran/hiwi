@@ -15,7 +15,6 @@ class App:
         self.__type_var = None
         self.__camera_var = None
         self.__pub_hb_var = None
-        self.__pub_data_var = None
         self.__cfg_file_entry = None
         self.__rgb_cfg_file_entry = None
         self.__ip_entry = None
@@ -127,7 +126,7 @@ class App:
                 pass
             return []
 
-        def get_video_device_by_device_name(file_path: str, device_name: str) -> int:
+        def get_video_device(file_path: str, device_name: str) -> int:
 
             try:
                 with open(file_path, "r") as yaml_file:
@@ -141,6 +140,23 @@ class App:
                     return
 
                 return video_devices[0]
+
+            except Exception as e:
+                print(f"Error: {str(e)}")
+
+        def get_uuid(file_path: str, device_name: str) -> str:
+            try:
+                with open(file_path, "r") as yaml_file:
+                    cfg_data = yaml.safe_load(yaml_file)
+                
+                uuids = [item['VIDEO_DEVICE'] for item in cfg_data.values() if isinstance(item, dict) and 
+                        'DEVICE_NAME' in item and item['DEVICE_NAME'] == device_name]
+                
+                if len(uuids) > 1:
+                    messagebox.showerror("Error", "Camera name duplicates found")
+                    return
+
+                return uuids[0]
 
             except Exception as e:
                 print(f"Error: {str(e)}")
@@ -211,19 +227,17 @@ class App:
 
                     camera_choices = [self.__camera_var.get(index) for index in self.__camera_var.curselection()]
                     pub_hb = str(self.__pub_hb_var.get())
-                    pub_data = str(self.__pub_data_var.get())
                     ip_address = self.__ip_entry.get()
                     port = self.__port_entry.get()
                     save_location = self.__save_location_label.cget('text')
-                    command = command + fr" --pub_hb {pub_hb} --pub_data {pub_data}"
+                    command = command + fr" --pub_hb {pub_hb}"
 
                     for camera in camera_choices:
 
-                        video_capture_index = get_video_device_by_device_name(file_path=cfg_file, device_name=camera)
+                        video_capture_index = get_video_device(file_path=cfg_file, device_name=camera)
+                        uuid = get_uuid(file_path=cfg_file, device_name=camera)
                         if video_capture_index:
-                            command = command + f" --vid_cap {video_capture_index}"
-
-                        print(command)
+                            command = command + f" --vid_cap {video_capture_index} --device {camera} --uuid {uuid}"
                         command = command.replace("\\", "/")
                         command_list = shlex.split(command)
                         subprocess.Popen(command_list)
@@ -356,12 +370,6 @@ class App:
             self.__pub_hb_var.set(True)
             pub_hb_checkbutton = tk.Checkbutton(subframe1, text="Yes", variable=self.__pub_hb_var, selectcolor='gray20', fg='white', bg='gray20', activebackground="gray20", activeforeground="white")
             pub_hb_checkbutton.pack()
-
-            pub_data_label = tk.Label(subframe1, text="Publish video data?", fg='white', bg='gray20')
-            pub_data_label.pack(pady=10)
-            self.__pub_data_var = tk.BooleanVar()
-            pub_data_checkbutton = tk.Checkbutton(subframe1, text="Yes", variable=self.__pub_data_var, selectcolor='gray20', fg='white', bg='gray20', activebackground="gray20", activeforeground="white")
-            pub_data_checkbutton.pack()
 
             run_sensor_button = tk.Button(subframe1, text="record video data", command=lambda: start_recording(type='camera'), fg='white', bg='gray20')
             run_sensor_button.pack(pady=15)
