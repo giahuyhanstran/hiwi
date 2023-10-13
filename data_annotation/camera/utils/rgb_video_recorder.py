@@ -91,4 +91,4 @@ class RGB_Video_Recorder:
 
         if not self.__args.pub_data:
             vp.stop_writer()
-            vp.merge_audio_video()
+            # vp.merge_audio_video() don't merge rn because of ffmep
