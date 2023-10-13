@@ -6,7 +6,6 @@ import yaml
 import shlex
 import keyboard
 
-
 def verify_cfg(file_path: str, type: str) -> bool:
 
     is_valid = False
@@ -61,7 +60,7 @@ def get_choices(file_path: str, listbox: str) -> list[str]:
             case 'type':
                 return list(cfg_data['READING'].keys())
             case 'camera':
-                [item['DEVICE_NAME'] for item in cfg_data.values() if isinstance(item, dict) and 'DEVICE_NAME' in item] 
+                return [item['DEVICE_NAME'] for item in cfg_data.values() if isinstance(item, dict) and 'DEVICE_NAME' in item] 
 
     except Exception as e:
         pass
