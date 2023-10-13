@@ -30,27 +30,30 @@ def _get_config(filename: str ='rgb_config.yml') -> dict:
 
     return cfg
 
-
 def main():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--length', type=int, help='default until interrupt, else time in seconds', default=None)
-    parser.add_argument('--hb_interval', type=int, help='heartbeat interval in seconds, default = 1', default=1)
-    parser.add_argument('--pub_hb', type=ast.literal_eval, help='publish heartbeat? True or False, default = True', default=True)
-    parser.add_argument('--pub_data', type=ast.literal_eval, help='publish data? True or False, else save locally, default = True', default=True)
-    parser.add_argument('--vid_cap', type=int, help='Decide which Video Capture channel open-cv should use, default = 0', default=0)
-    parser.add_argument('--ip', type=str, help='Pass an ip-address used by the mqtt-Broker to publish heartbeats, default = localhost', default='localhost')
-    parser.add_argument('--port', type=int, help='Pass a port used by the mqtt-Broker to publish heartbeats, default = 1883', default=1883)
-    parser.add_argument('--save_loc', type=str, help='Enter a path to a folder that will be used as a save location for the recordings, default = None', default=None)
+    parser.add_argument('--length', type=int, default=None, 
+                        help='default until interrupt, else time in seconds')
+    parser.add_argument('--hb_interval', type=int, default=1, 
+                        help='heartbeat interval in seconds, default = 1')
+    parser.add_argument('--pub_hb', type=ast.literal_eval, default=True, 
+                        help='publish heartbeat? True or False, default = True')
+    parser.add_argument('--pub_data', type=ast.literal_eval, 
+                        help='publish data? True or False, else save locally, default = True', default=True)
+    parser.add_argument('--vid_cap', type=int, 
+                        help='Decide which Video Capture channel open-cv should use, default = 0', default=0)
+    parser.add_argument('--ip', type=str, 
+                        help='Pass an ip-address used by the mqtt-Broker to publish heartbeats, default = localhost', default='localhost')
+    parser.add_argument('--port', type=int, 
+                        help='Pass a port used by the mqtt-Broker to publish heartbeats, default = 1883', default=1883)
+    parser.add_argument('--save_loc', type=str, 
+                        help='Enter a path to a folder that will be used as a save location for the recordings, default = None', default=None)
 
-    
     args = parser.parse_args()
-
     rgb_cfg = _get_config()
-
     recorder = RGB_Video_Recorder(args, rgb_cfg)
     recorder.record_video_audio()
-
 
 if __name__ == '__main__':
 
