@@ -1,0 +1,20 @@
+{
+ "event_type": "sensfloor-event-type MESSAGE_RECEIVED",
+ "event_millis": 1442903962387,
+ "message_type": "sensfloor-sensor-change-message",
+ "raw_message": "/QE1BAUQAAHXAAAAD08WAAA=",
+ "GID": "0135",
+ "MODID": "0405",
+ "SENS": "10",
+ "THIGH": "00",
+ "DEF": "01",
+ "PARA": "d7",
+ "byte0": "00",
+ "byte1": "00",
+ "byte2": "00",
+ "byte3": "0f",
+ "byte4": "4f",
+ "byte5": "16",
+ "byte6": "00",
+ "byte7": "00"
+}
