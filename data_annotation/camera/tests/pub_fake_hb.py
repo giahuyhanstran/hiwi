@@ -4,7 +4,7 @@ import uuid
 import struct
 from random import randint
 
-mqttBroker = "192.168.1.80"
+mqttBroker = "localhost"
 client = mqtt.Client("Topi")
 client.connect(host = mqttBroker, port = 1883)
 uuid_bytes1 = uuid.UUID('1aad35ef-4fac-4bf9-ae2f-5b2af6ae5ddd').bytes

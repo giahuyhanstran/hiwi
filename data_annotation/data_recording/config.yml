@@ -3,8 +3,7 @@ READ_FROM: MQTT
 MQTT:
   USERNAME: marcel.walz
   PASSWORD:
-  ADDRESS: 192.168.1.80
-  ADDRESS-L: localhost
+  ADDRESS: 172.16.10.13
   PORT: 1883
 
 #---------- Subtopics to publish for each Zone
@@ -61,3 +60,19 @@ ZONE_3: # Linke zone
   LOC:
     - -1 # von mitte des bettes 1m nach links
     - 0
+
+ZONE_4: # Next Gen Sensor
+  MAC_ADDRESS: DA:6D:19:9F:D4:71
+  NAME: Next_Gen
+
+ZONE_5: # Im GWA Testroom
+  MAC_ADDRESS: CF:5B:FB:7D:97:50
+  NAME: GWA-SensorV3_1
+
+ZONE_6: # Im GWA Testroom
+  MAC_ADDRESS: C2:8A:64:1D:DE:45
+  NAME: GWA-SensorV3_2
+
+ZONE_7: # Im GWA Testroom
+  MAC_ADDRESS: DD:E0:A5:B0:8F:74
+  NAME: GWA-SensorV3_2
