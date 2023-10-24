@@ -95,29 +95,44 @@ def generate_visualization_grid(grid):
     return vis_grid
 
 
+def highlight_condition(x, y, grid_shape, cell_info_list):
+    # Calculate the adjusted y-coordinate in the new coordinate system
+    x_new = grid_shape[0] - x - 1
+
+    # Check if the cell's date is among the 10 most recent dates
+    cell_date = grid[x_new, y]['Date']
+    recent_dates = sorted([cell_info['Date'] for cell_info in cell_info_list], reverse=True)[:500]
+
+    return cell_date in recent_dates
+
+
 def apply_info(data, grid):
     cell_info_list = []
+    print(data[0])
 
     for count, (x, y) in enumerate(data[0]):
         cell_info = grid[y, x]
 
         cell_info['Number_of_Activations'] += 1
+        cell_info['most_recent_activation'] = True
         cell_info['Date'] = data[1][count]
         cell_info_list.append(cell_info)
 
-        plot_grid(cell_info_list, generate_visualization_grid(grid))
-
-    calc_recent_activation(cell_info_list)
+        # Calculate the grid shape
+        grid_shape = grid.shape
+        # Call plot_grid with the dynamic highlight_condition and adjusted y-coordinate
+        plot_grid(cell_info_list, generate_visualization_grid(grid),
+                  lambda x, y: highlight_condition(x, y, grid_shape, cell_info_list))
 
 
 def calc_recent_activation(applied_grid):
-    
     ...
 
 
 def plot_grid(applied_grid, grid, highlight_condition):
     info_grid = (applied_grid, grid)
-    print(info_grid)
+    linewidth = 2.0
+    #print(info_grid)
 
     # x and y axis is swapped
     custom_colors = [(255, 245, 235), (254, 230, 206), (253, 208, 162), (253, 174, 107),
@@ -128,12 +143,9 @@ def plot_grid(applied_grid, grid, highlight_condition):
     vis_grid = grid[::-1]
     n, m = vis_grid.shape
 
-
     cax = ax.imshow(vis_grid, cmap=custom_cmap, interpolation='none', aspect='auto')
-    # plt.imshow(np.ones_like(grid), cmap='binary', interpolation='none', aspect='auto')
     plt.xticks([])  # Hide x-axis ticks
     plt.yticks([])  # Hide y-axis ticks
-    # print(vis_grid)
 
     for i in range(n):
         for j in range(m):
@@ -145,7 +157,7 @@ def plot_grid(applied_grid, grid, highlight_condition):
                 cell_color = 'black'
                 cell_edgecolor = 'white'  # Set the outline color to white for other cells
             plt.text(j, i, cell_value, ha='center', va='center', color=cell_color, fontsize=8)
-            rect = plt.Rectangle((j - 0.5, i - 0.5), 1, 1, fill=False, edgecolor=cell_edgecolor)
+            rect = plt.Rectangle((j - 0.5, i - 0.5), 1, 1, fill=False, edgecolor=cell_edgecolor, linewidth=linewidth)
             ax.add_patch(rect)
 
     # Add spacing between squares
@@ -154,18 +166,14 @@ def plot_grid(applied_grid, grid, highlight_condition):
     for j in range(1, m):
         plt.axvline(j - 0.5, color='black', lw=0.5, linestyle='--')
 
-
     title_key = 'Date'
-    print(info_grid[0][-1])
-    #print(info_grid[0][title_key])
-    # real_time = datetime.datetime.fromtimestamp(info_grid[1][1][title_key])
+    #print(info_grid[0][-1])
     plt.title(f'{info_grid[0][-1][title_key]}')
-    # plt.text(5, 10, real_time, fontsize=14)
 
     folder_name = 'pictures'
     current_msg = -1
 
-    file_name = f"{info_grid[0][-1][title_key]}_lol.png"
+    file_name = f"{info_grid[0][-1][title_key]}.png"
     file_path = os.path.join(folder_name, file_name)
 
     if not os.path.exists(folder_name):
@@ -175,7 +183,7 @@ def plot_grid(applied_grid, grid, highlight_condition):
 
 
 if __name__ == "__main__":
-    folder_path = 'json'
+    folder_path = 'json_folder'
     loaded_data = fetch_message(folder_path)
 
     modifications = fetch_Data(loaded_data)
@@ -183,6 +191,3 @@ if __name__ == "__main__":
 
     apply_info(modifications, grid)
     # calc_recent_activation(applied_grid)
-
-
-
