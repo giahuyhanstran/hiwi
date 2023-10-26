@@ -50,17 +50,17 @@ def fetch_message(folder_path):
     return json_data
 
 
-def fetch_Data(loaded_data):
-    Modids = []
-    Date = []
-    Data = (Modids, Date)
+def fetch_data(loaded_data):
+    modids = []
+    date = []
+    data = (modids, date)
     # print(len(loaded_data))
     for data in loaded_data:
-        Modids.append((int(data['MODID'][:2], 16) - 1, int(data['MODID'][2:], 16) - 2))
-        Date.append(data['event_millis'])
+        modids.append((int(data['MODID'][:2], 16) - 1, int(data['MODID'][2:], 16) - 2))
+        date.append(data['event_millis'])
     # print(len(Modids),len(Date))
 
-    return Data
+    return data
 
 
 def generate_grid():
@@ -95,22 +95,24 @@ def generate_visualization_grid(grid):
     return vis_grid
 
 
-def highlight_condition(x, y, grid_shape, cell_info_list):
+def highlight_condition(x, y, grid_shape, cell_info_list, prev_marked):
     # Calculate the adjusted y-coordinate in the new coordinate system
     x_new = grid_shape[0] - x - 1
 
     # Check if the cell's date is among the 10 most recent dates
     cell_date = grid[x_new, y]['Date']
-    recent_dates = sorted([cell_info['Date'] for cell_info in cell_info_list], reverse=True)[:500]
+    recent_dates = sorted([cell_info['Date'] for cell_info in cell_info_list], reverse=True)[:prev_marked]
 
     return cell_date in recent_dates
 
 
 def apply_info(data, grid):
     cell_info_list = []
-    print(data[0])
-
+    MARKED_PREV = 50
     for count, (x, y) in enumerate(data[0]):
+        if len(cell_info_list) >= MARKED_PREV:
+            del cell_info_list[0]
+
         cell_info = grid[y, x]
 
         cell_info['Number_of_Activations'] += 1
@@ -122,17 +124,13 @@ def apply_info(data, grid):
         grid_shape = grid.shape
         # Call plot_grid with the dynamic highlight_condition and adjusted y-coordinate
         plot_grid(cell_info_list, generate_visualization_grid(grid),
-                  lambda x, y: highlight_condition(x, y, grid_shape, cell_info_list))
-
-
-def calc_recent_activation(applied_grid):
-    ...
+                  highlight_condition(x, y, grid_shape, cell_info_list, MARKED_PREV))
 
 
 def plot_grid(applied_grid, grid, highlight_condition):
     info_grid = (applied_grid, grid)
     linewidth = 2.0
-    #print(info_grid)
+    # print(info_grid)
 
     # x and y axis is swapped
     custom_colors = [(255, 245, 235), (254, 230, 206), (253, 208, 162), (253, 174, 107),
@@ -144,18 +142,18 @@ def plot_grid(applied_grid, grid, highlight_condition):
     n, m = vis_grid.shape
 
     cax = ax.imshow(vis_grid, cmap=custom_cmap, interpolation='none', aspect='auto')
-    plt.xticks([])  # Hide x-axis ticks
-    plt.yticks([])  # Hide y-axis ticks
+    plt.xticks([])
+    plt.yticks([])
 
     for i in range(n):
         for j in range(m):
             cell_value = int(vis_grid[i, j])
             if highlight_condition(i, j):
                 cell_color = 'black'
-                cell_edgecolor = 'purple'  # Set the outline color to purple for every second cell
+                cell_edgecolor = 'purple'
             else:
                 cell_color = 'black'
-                cell_edgecolor = 'white'  # Set the outline color to white for other cells
+                cell_edgecolor = 'white'
             plt.text(j, i, cell_value, ha='center', va='center', color=cell_color, fontsize=8)
             rect = plt.Rectangle((j - 0.5, i - 0.5), 1, 1, fill=False, edgecolor=cell_edgecolor, linewidth=linewidth)
             ax.add_patch(rect)
@@ -167,7 +165,7 @@ def plot_grid(applied_grid, grid, highlight_condition):
         plt.axvline(j - 0.5, color='black', lw=0.5, linestyle='--')
 
     title_key = 'Date'
-    #print(info_grid[0][-1])
+    # print(info_grid[0][-1])
     plt.title(f'{info_grid[0][-1][title_key]}')
 
     folder_name = 'pictures'
@@ -180,13 +178,14 @@ def plot_grid(applied_grid, grid, highlight_condition):
         os.makedirs(folder_name)
 
     plt.savefig(file_path)
+    plt.close()
 
 
 if __name__ == "__main__":
     folder_path = 'json_folder'
     loaded_data = fetch_message(folder_path)
 
-    modifications = fetch_Data(loaded_data)
+    modifications = fetch_data(loaded_data)
     grid = generate_grid()
 
     apply_info(modifications, grid)
