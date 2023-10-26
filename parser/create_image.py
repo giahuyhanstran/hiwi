@@ -50,17 +50,17 @@ def fetch_message(folder_path):
     return json_data
 
 
-def fetch_data(loaded_data):
-    modids = []
-    date = []
-    data = (modids, date)
+def fetch_Data(loaded_data):
+    Modids = []
+    Date = []
+    Data = (Modids, Date)
     # print(len(loaded_data))
     for data in loaded_data:
-        modids.append((int(data['MODID'][:2], 16) - 1, int(data['MODID'][2:], 16) - 2))
-        date.append(data['event_millis'])
+        Modids.append((int(data['MODID'][:2], 16) - 1, int(data['MODID'][2:], 16) - 2))
+        Date.append(data['event_millis'])
     # print(len(Modids),len(Date))
 
-    return data
+    return Data
 
 
 def generate_grid():
@@ -124,7 +124,11 @@ def apply_info(data, grid):
         grid_shape = grid.shape
         # Call plot_grid with the dynamic highlight_condition and adjusted y-coordinate
         plot_grid(cell_info_list, generate_visualization_grid(grid),
-                  highlight_condition(x, y, grid_shape, cell_info_list, MARKED_PREV))
+                  lambda x, y: highlight_condition(x, y, grid_shape, cell_info_list,MARKED_PREV))
+
+
+def calc_recent_activation(applied_grid):
+    ...
 
 
 def plot_grid(applied_grid, grid, highlight_condition):
@@ -185,7 +189,7 @@ if __name__ == "__main__":
     folder_path = 'json_folder'
     loaded_data = fetch_message(folder_path)
 
-    modifications = fetch_data(loaded_data)
+    modifications = fetch_Data(loaded_data)
     grid = generate_grid()
 
     apply_info(modifications, grid)
