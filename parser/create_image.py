@@ -1,8 +1,8 @@
-import datetime
-import matplotlib.pyplot as plt
-import numpy as np
 import os
 
+import matplotlib.pyplot as plt
+import numpy as np
+from PIL import Image
 from matplotlib.colors import ListedColormap
 
 import json
@@ -49,18 +49,41 @@ def fetch_message(folder_path):
 
     return json_data
 
-
 def fetch_Data(loaded_data):
     Modids = []
     Date = []
-    Data = (Modids, Date)
+    temp_status = []
+    Status = []
+    Data = (Modids, Date, Status)
+
     # print(len(loaded_data))
     for data in loaded_data:
+
         Modids.append((int(data['MODID'][:2], 16) - 1, int(data['MODID'][2:], 16) - 2))
         Date.append(data['event_millis'])
+
+        for i in range(8):
+            temp_status.append(int(data[f'byte{i}'], 16))
+        temp_max = max(temp_status)
+        Status.append(temp_max)
+        temp_status = []
+        temp_max = 0
+
     # print(len(Modids),len(Date))
 
     return Data
+
+
+def fetch_gradient():
+    current_directory = os.getcwd()
+    image_filename = "SensFloor_Gradient.png"
+
+    image_path = os.path.join(current_directory, image_filename)
+    image = Image.open(image_path)
+
+    image_array = np.array(image) / 255  # normalize rgba
+    print(len(image_array[0]))
+    return image_array[0]
 
 
 def generate_grid():
@@ -75,7 +98,8 @@ def generate_grid():
             cell_info = {
                 'SensorId': SensorIds[count],
                 'Number_of_Activations': 0,
-                'Date': None
+                'Date': None,
+                'Status': 0
             }
             grid[i, j] = cell_info
 
@@ -89,8 +113,8 @@ def generate_visualization_grid(grid):
     for i in range(ROWS):
         for j in range(COLUMNS):
             cell_info = grid[i, j]
-            vis_info = cell_info['Number_of_Activations']
-            vis_grid[i, j] = vis_info
+            vis_info = cell_info['Status']
+            vis_grid[i, j] = float(vis_info)
 
     return vis_grid
 
@@ -107,6 +131,8 @@ def highlight_condition(x, y, grid_shape, cell_info_list, prev_marked):
 
 
 def apply_info(data, grid):
+    color = fetch_gradient()
+
     cell_info_list = []
     MARKED_PREV = 50
     for count, (x, y) in enumerate(data[0]):
@@ -118,34 +144,40 @@ def apply_info(data, grid):
         cell_info['Number_of_Activations'] += 1
         cell_info['most_recent_activation'] = True
         cell_info['Date'] = data[1][count]
+        cell_info['Status'] = data[2][count]
         cell_info_list.append(cell_info)
 
         # Calculate the grid shape
         grid_shape = grid.shape
         # Call plot_grid with the dynamic highlight_condition and adjusted y-coordinate
         plot_grid(cell_info_list, generate_visualization_grid(grid),
-                  lambda x, y: highlight_condition(x, y, grid_shape, cell_info_list,MARKED_PREV))
+                  lambda x, y: highlight_condition(x, y, grid_shape, cell_info_list, MARKED_PREV), color)
 
 
 def calc_recent_activation(applied_grid):
     ...
 
 
-def plot_grid(applied_grid, grid, highlight_condition):
+def plot_grid(applied_grid, grid, highlight_condition, color):
     info_grid = (applied_grid, grid)
     linewidth = 2.0
     # print(info_grid)
 
     # x and y axis is swapped
-    custom_colors = [(255, 245, 235), (254, 230, 206), (253, 208, 162), (253, 174, 107),
-                     (253, 141, 60), (241, 105, 19), (217, 72, 1), (166, 54, 3), (127, 39, 4)]
-    normalized_colors = [(r / 255, g / 255, b / 255) for r, g, b in custom_colors]
+    # custom_colors = [(255, 245, 235), (254, 230, 206), (253, 208, 162), (253, 174, 107),
+    #                 (253, 141, 60), (241, 105, 19), (217, 72, 1), (166, 54, 3), (127, 39, 4)]
+    normalized_colors = color
+    #[(r / 255, g / 255, b / 255) for r, g, b in custom_colors]
+
     custom_cmap = ListedColormap(normalized_colors)
+    vmin = custom_cmap(0)
+    vmax = custom_cmap(255)
+
     fig, ax = plt.subplots()
     vis_grid = grid[::-1]
     n, m = vis_grid.shape
 
-    cax = ax.imshow(vis_grid, cmap=custom_cmap, interpolation='none', aspect='auto')
+    cbar = plt.colorbar(ax.imshow(vis_grid, cmap=custom_cmap, vmin=0, vmax=255), ax=ax)
     plt.xticks([])
     plt.yticks([])
 
@@ -169,11 +201,9 @@ def plot_grid(applied_grid, grid, highlight_condition):
         plt.axvline(j - 0.5, color='black', lw=0.5, linestyle='--')
 
     title_key = 'Date'
-    # print(info_grid[0][-1])
     plt.title(f'{info_grid[0][-1][title_key]}')
 
-    folder_name = 'pictures'
-    current_msg = -1
+    folder_name = 'pictures_1'
 
     file_name = f"{info_grid[0][-1][title_key]}.png"
     file_path = os.path.join(folder_name, file_name)
